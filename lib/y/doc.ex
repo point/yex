@@ -191,14 +191,18 @@ defmodule Y.Doc do
   end
 
   def pack(%Transaction{doc: %Doc{} = doc} = transaction) do
+    %{transaction | doc: pack!(doc)}
+  end
+
+  def pack!(%Doc{share: share} = doc) do
     share =
-      doc.share
+      share
       |> Enum.map(fn {name, type} ->
         {name, Type.pack(type)}
       end)
       |> Enum.into(%{})
 
-    %{transaction | doc: %Doc{doc | share: share}}
+   %{doc | share: share}
   end
 
   def apply_update(update, transaction) when is_bitstring(update) do

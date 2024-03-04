@@ -11,6 +11,7 @@ defmodule Y.Encoder do
 
   def encode(doc_name) do
     with {:ok, doc} <- Doc.get_instance(doc_name),
+         doc <- Doc.pack!(doc),
          sm <-
            doc
            |> Doc.highest_clock_with_length!()
