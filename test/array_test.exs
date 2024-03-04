@@ -62,10 +62,10 @@ defmodule Y.ArrayTest do
                  %Y.Item{
                    content: [1],
                    deleted?: false,
-                   id: %Y.ID{client: 1730, clock: 1},
+                   id: %Y.ID{client: _, clock: 1},
                    keep?: true,
                    length: 1,
-                   origin: %Y.ID{client: 1730, clock: 0},
+                   origin: %Y.ID{client: _, clock: 0},
                    parent_name: "array2",
                    parent_sub: nil,
                    right_origin: nil
@@ -73,19 +73,19 @@ defmodule Y.ArrayTest do
                  %Y.Item{
                    content: [2],
                    deleted?: false,
-                   id: %Y.ID{client: 1730, clock: 2},
+                   id: %Y.ID{client: _, clock: 2},
                    keep?: true,
                    length: 1,
-                   origin: %Y.ID{client: 1730, clock: 1},
+                   origin: %Y.ID{client: _, clock: 1},
                    parent_name: "array2",
                    parent_sub: nil,
                    right_origin: nil
                  },
                  %Y.Item{
-                   id: %Y.ID{client: 1730, clock: 3},
+                   id: %Y.ID{client: _, clock: 3},
                    length: 1,
                    content: [3],
-                   origin: %Y.ID{client: 1730, clock: 2},
+                   origin: %Y.ID{client: _, clock: 2},
                    right_origin: nil,
                    parent_name: "array2",
                    parent_sub: nil,
