@@ -163,7 +163,7 @@ defmodule Y.Type.Array.ArrayTree do
     end
   end
 
-  def replace(%ArrayTree{ft: tree} = array_tree, item, with_items) do
+  def replace(%ArrayTree{ft: tree} = array_tree, item, with_items) when is_list(with_items) do
     {l, v, r} =
       FingerTree.split(tree, fn %{highest_clocks: clocks} ->
         Map.fetch!(clocks, item.id.client) >= item.id.clock
@@ -179,6 +179,62 @@ defmodule Y.Type.Array.ArrayTree do
       {:ok, %{array_tree | ft: tree}}
     else
       {:error, "Item not found"}
+    end
+  end
+
+  def transform(%ArrayTree{ft: tree} = array_tree, %Item{} = starting_item, acc \\ nil, fun)
+      when is_function(fun, 2) do
+    {l, v, r} =
+      FingerTree.split(tree, fn %{highest_clocks: clocks} ->
+        case Map.fetch(clocks, starting_item.id.client) do
+          {:ok, c} -> c >= starting_item.id.clock
+          _ -> false
+        end
+      end)
+
+    if v == starting_item do
+      tree =
+        case do_transform(v, l, r, acc, fun) do
+          {left_tree, nil} ->
+            left_tree
+
+          {left_tree, right_tree} ->
+            FingerTree.append(left_tree, right_tree)
+        end
+
+      {:ok, %{array_tree | ft: tree}}
+    else
+      {:error, "Item not found"}
+    end
+  end
+
+  def do_transform(nil, left_tree, right_tree, _acc, _fun), do: {left_tree, right_tree}
+
+  def do_transform(_, left_tree, nil, _acc, _fun),
+    do: {left_tree, nil}
+
+  def do_transform(%Item{} = item, left_tree, right_tree, acc, fun) do
+    case fun.(item, acc) do
+      {%Item{} = new_item, new_acc} ->
+        do_transform(
+          FingerTree.first(right_tree),
+          FingerTree.conj(left_tree, new_item),
+          FingerTree.rest(right_tree),
+          new_acc,
+          fun
+        )
+
+      %Item{} = new_item ->
+        do_transform(
+          FingerTree.first(right_tree),
+          FingerTree.conj(left_tree, new_item),
+          FingerTree.rest(right_tree),
+          acc,
+          fun
+        )
+
+      nil ->
+        {FingerTree.conj(left_tree, item), right_tree}
     end
   end
 
@@ -282,6 +338,26 @@ defmodule Y.Type.Array.ArrayTree do
 
   def first(%ArrayTree{ft: tree}), do: FingerTree.first(tree)
   def last(%ArrayTree{ft: tree}), do: FingerTree.last(tree)
+
+  def length(%ArrayTree{ft: tree}) do
+    %Meter{len: len} = FingerTree.measure(tree)
+    len
+  end
+
+  def at(%ArrayTree{ft: %EmptyTree{}}, _index), do: nil
+
+  def at(%ArrayTree{ft: tree} = array_tree, index) do
+    if index > ArrayTree.length(array_tree) - 1 do
+      nil
+    else
+      {_, v, _} =
+        FingerTree.split(tree, fn %{len: len} ->
+          len > index
+        end)
+
+      v
+    end
+  end
 
   defp do_between(%EmptyTree{}, _, acc), do: acc
 

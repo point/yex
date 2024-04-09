@@ -2,7 +2,7 @@ defprotocol Y.Type do
   def highest_clock(type, client)
   def highest_clock_with_length(type, client)
   def pack(type)
-  def to_list(type, opts)
+  def to_list(type, opts \\ [])
   def find(type, id, default \\ nil)
   def unsafe_replace(type, item, with_items)
   def between(type, left, right)
@@ -12,4 +12,5 @@ defprotocol Y.Type do
   def prev(type, item)
   def first(type)
   def last(type)
+  def delete(type, transaction, id)
 end

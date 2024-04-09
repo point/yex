@@ -4,12 +4,13 @@ defmodule Y.Item do
   alias Y.Doc
   alias Y.Transaction
   alias Y.Type
+  alias Y.Skip
   alias Y.Content.Binary
 
   require Logger
 
   defstruct id: %ID{},
-            length: 1,
+            length: 0,
             content: nil,
             origin: nil,
             right_origin: nil,
@@ -44,6 +45,7 @@ defmodule Y.Item do
   def content_length(%Item{deleted?: true}), do: 0
   def content_length(%Item{content: content}) when is_list(content), do: length(content)
   def content_length(%Item{}), do: 1
+  def content_length(%Skip{length: len}), do: len
 
   def id(nil), do: nil
   def id(%Item{id: id}), do: id
@@ -146,7 +148,7 @@ defmodule Y.Item do
          %Item{parent_name: parent_name} <- Doc.find_item(transaction, item_of_parent_id) do
       integrate(%{item | parent_name: parent_name}, transaction, offset)
     else
-      false -> {:retry, item}
+      false -> {:invalid, item}
       _ -> {:error, "Cannot integrate item"}
     end
   end
@@ -175,7 +177,7 @@ defmodule Y.Item do
           {:error, "Cannot integrate item"}
       end
     else
-      {:retry, item}
+      {:invalid, transaction}
     end
   end
 
@@ -191,6 +193,9 @@ defmodule Y.Item do
            {:ok, _transaction} = res <- Transaction.update(transaction, updated_type) do
         res
       else
+        false ->
+          {:invalid, transaction}
+
         nil ->
           case Type.add_before(type, Type.first(type), item) do
             {:ok, updated_type} ->
@@ -212,13 +217,16 @@ defmodule Y.Item do
 
   def explode(%Item{} = item) do
     {acc, item_to_add} =
-      Enum.reduce(2..Item.content_length(item), {[], item}, fn _, {acc, item} ->
+      Enum.reduce(2..Item.content_length(item)//1, {[], item}, fn _, {acc, item} ->
         {item_l, item_r} = split(item, 1)
         {[item_l | acc], item_r}
       end)
 
     Enum.reverse([item_to_add | acc])
   end
+
+  def delete(%Item{deleted?: true} = item), do: item
+  def delete(%Item{} = item), do: %Item{item | deleted?: true}
 
   defp valid_origin?(_, %{origin: nil}), do: true
 

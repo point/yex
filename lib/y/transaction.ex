@@ -1,12 +1,15 @@
 defmodule Y.Transaction do
   alias __MODULE__
   alias Y.Doc
+  alias Y.Item
+  alias Y.Type
 
   defstruct doc: nil,
-            delete_set: %{clients: %{}},
+            doc_before: nil,
+            delete_set: %{},
             before_state: nil,
             after_state: %{},
-            changed: %{},
+            changed: MapSet.new(),
             changed_parent_types: %{},
             merge_structs: [],
             origin: nil,
@@ -21,6 +24,7 @@ defmodule Y.Transaction do
   def new(%Doc{} = doc, origin, local) do
     t = %Transaction{
       doc: doc,
+      doc_before: doc,
       origin: origin,
       local: local
     }
@@ -29,13 +33,80 @@ defmodule Y.Transaction do
   end
 
   def update(transaction, type) do
-    {:ok, %{transaction | doc: Doc.replace(transaction.doc, type)}}
+    {:ok,
+     %{
+       transaction
+       | doc: Doc.replace(transaction.doc, type),
+         changed: MapSet.put(transaction.changed, type.name)
+     }}
+  end
+
+  def finalize(%Transaction{doc: doc, doc_before: doc_before, changed: changed} = transaction) do
+    changed_names = MapSet.to_list(changed)
+
+    delete_set =
+      Enum.reduce(doc.share, transaction.delete_set, fn {type_name, type}, delete_set ->
+        with true <- type_name in changed_names,
+             {:ok, type_before} <- Doc.get!(doc_before, type_name) do
+          put_deleted_to_delete_set(delete_set, type, type_before)
+        else
+          _ -> delete_set
+        end
+      end)
+
+    %{transaction | delete_set: delete_set}
+    |> merge_delete_sets_to_doc()
   end
 
   def force_pack(%Transaction{} = transaction), do: %{transaction | need_pack: true}
 
   def cleanup(%Transaction{need_pack: true} = transaction), do: Doc.pack(transaction)
   def cleanup(transaction), do: transaction
+
+  def add_to_delete_set(transaction, client, clock, length \\ 1) do
+    ds =
+      Map.update(
+        transaction.delete_set,
+        client,
+        MapSet.new([{clock, length}]),
+        &MapSet.put(&1, {clock, length})
+      )
+
+    %{transaction | delete_set: ds}
+  end
+
+  defp put_deleted_to_delete_set(delete_set, type, type_before) do
+    Enum.reduce(type, delete_set, fn
+      %Item{deleted?: true} = item, ds ->
+        case Type.find(type_before, item.id) do
+          %Item{deleted?: false} ->
+            Map.update(
+              ds,
+              item.id.client,
+              MapSet.new([{item.id.clock, item.length}]),
+              &MapSet.put(&1, {item.id.clock, item.length})
+            )
+
+          _ ->
+            ds
+        end
+
+      _, ds ->
+        ds
+    end)
+  end
+
+  defp merge_delete_sets_to_doc(
+         %Transaction{doc: %{delete_set: doc_delete_set} = doc, delete_set: delete_set} =
+           transaction
+       ) do
+    ds =
+      Map.merge(doc_delete_set, delete_set, fn _k, v1, v2 ->
+        MapSet.union(v1, v2)
+      end)
+
+    %{transaction | doc: %{doc | delete_set: ds}}
+  end
 
   # def cleanup(%Doc{} = doc, []), do: doc
   #

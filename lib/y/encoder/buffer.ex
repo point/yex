@@ -6,7 +6,7 @@ defmodule Y.Encoder.Buffer do
   alias Y.Encoder.Bufferable
   alias Y.Encoder.StringBuffer
 
-  import Y.Encoder.Operations, only: [write_bitstring: 1]
+  import Y.Encoder.Operations, only: [write_bitstring: 1, write_uint: 1]
 
   defstruct rest: <<>>,
             client: ClientOrLengthBuffer.new(),
@@ -15,7 +15,8 @@ defmodule Y.Encoder.Buffer do
             right_clock: ClockBuffer.new(),
             parent_info: InfoBuffer.new(),
             string: StringBuffer.new(),
-            length: ClientOrLengthBuffer.new()
+            length: ClientOrLengthBuffer.new(),
+            delete_set_cur_val: 0
 
   def new(), do: %Buffer{}
 
@@ -55,10 +56,21 @@ defmodule Y.Encoder.Buffer do
     %{b | string: StringBuffer.write(sb, str)}
   end
 
+  def write(%Buffer{} = b, :ds_clock, clock) do
+    diff = clock - b.delete_set_cur_val
+    %{b | delete_set_cur_val: clock} |> write(:rest, write_uint(diff))
+  end
+
+  def write(%Buffer{} = b, :ds_length, length) do
+    %{b | delete_set_cur_val: b.delete_set_cur_val + length} |> write(:rest, length - 1)
+  end
+
   def write(%Buffer{} = b, key, what) do
     existing = Map.fetch!(b, key)
     %{b | key => existing <> what}
   end
+
+  def reset_delete_set_current_value(%Buffer{} = b), do: %{b | delete_set_cur_val: 0}
 
   def dump(%Buffer{} = b) do
     key_clock = <<>>

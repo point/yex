@@ -20,7 +20,8 @@ defmodule Y.Decoder.State do
             parent_info: %Y.Decoder.CSState{count: 0, s: 0, buf: <<>>},
             type_ref: <<>>,
             length: %Y.Decoder.CSState{count: 0, s: 0, buf: <<>>},
-            rest: <<>>
+            rest: <<>>,
+            delete_set_cur_val: 0
 
   def new(
         key_clock: key_clock,
@@ -32,14 +33,16 @@ defmodule Y.Decoder.State do
         parent_info: parent_info,
         type_ref: type_ref,
         length: length,
-        rest: rest
+        rest: rest,
+        delete_set_cur_val: delete_set_cur_val
       ),
       do:
         %State{
           key_clock: key_clock,
           string: string,
           type_ref: type_ref,
-          rest: rest
+          rest: rest,
+          delete_set_cur_val: delete_set_cur_val
         }
         |> put_in([Access.key!(:client), Access.key!(:buf)], client)
         |> put_in([Access.key!(:info), Access.key!(:buf)], info)
@@ -53,4 +56,18 @@ defmodule Y.Decoder.State do
     {ret, new_msg} = f.(msg)
     {ret, %{state | key => new_msg}}
   end
+
+  def read_ds_clock(%State{} = state, f) do
+    {clock, state} = f.(Map.fetch!(state, :rest))
+    clock = state.delete_set_cur_val + clock
+    {clock, %{state | delete_set_cur_val: clock}}
+  end
+
+  def read_ds_len(%State{} = state, f) do
+    {diff, state} = f.(Map.fetch!(state, :rest))
+    diff = diff + 1
+    {diff, %{state | delete_set_cur_val: state.delete_set_cur_val + diff}}
+  end
+
+  def reset_ds_cur_val(%State{} = state), do: %{state | delete_set_cur_val: 0}
 end

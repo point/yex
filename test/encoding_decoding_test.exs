@@ -18,8 +18,8 @@ defmodule Y.EncodingDecodingTest do
   test "decode message from js", %{js_msg: js_msg} do
     {:ok, doc} = Doc.new(name: :decode_message_from_js)
     {:ok, doc_instance} = Doc.get_instance(doc)
-    transaction = Transaction.new(doc_instance, nil, true)
-    transaction = Decoder.decode(js_msg, transaction)
+    %Transaction{} = transaction = Transaction.new(doc_instance, nil, true)
+    %Transaction{} = transaction = Decoder.decode(js_msg, transaction)
 
     assert {:ok,
             %Y.Type.Unknown{

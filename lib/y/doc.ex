@@ -20,7 +20,10 @@ defmodule Y.Doc do
           autoload: boolean(),
           meta: term(),
           loaded?: boolean(),
-          synced?: boolean()
+          synced?: boolean(),
+          delete_set: Map.t(),
+          pending_structs: Map.t() | nil,
+          pending_delete_sets: Map.t() | nil
         }
 
   defstruct name: nil,
@@ -36,7 +39,10 @@ defmodule Y.Doc do
             autoload: false,
             meta: nil,
             loaded?: false,
-            synced?: false
+            synced?: false,
+            delete_set: %{},
+            pending_structs: nil,
+            pending_delete_sets: nil
 
   def start_link(opts \\ []) do
     opts = compose_opts(opts)
@@ -86,19 +92,18 @@ defmodule Y.Doc do
     end
   end
 
-  def get(%Transaction{doc: %{share: share}}, name) when is_map_key(share, name),
-    do: Map.fetch(share, name)
-
-  def get(%Transaction{}, name), do: {:error, "Type #{name} does not exist"}
+  def get(%Transaction{doc: doc}, name), do: get!(doc, name)
 
   def get(doc_name, name) do
-    with {:ok, doc} <- get_instance(doc_name),
-         {:ok, _} = res <- Map.fetch(doc.share, name) do
-      res
-    else
-      :error -> {:error, "Type #{name} does not exist"}
+    with {:ok, doc} <- get_instance(doc_name) do
+      get!(doc, name)
     end
   end
+
+  def get!(%Doc{share: share}, name) when is_map_key(share, name),
+    do: Map.fetch(share, name)
+
+  def get!(%Doc{}, name), do: {:error, "Type #{name} does not exist"}
 
   def get_or_create_unknown(%Transaction{doc: doc} = transaction, name) do
     case get(transaction, name) do
@@ -186,6 +191,17 @@ defmodule Y.Doc do
     end)
   end
 
+  def type_with_id!(%Doc{} = doc, %ID{} = id) do
+    doc.share
+    |> Map.values()
+    |> Enum.filter(fn type -> Type.highest_clock_with_length(type, :all) >= id.clock end)
+    |> Enum.find(fn type ->
+      type
+      |> Type.to_list(as_items: true)
+      |> Enum.find(fn %{id: item_id} -> item_id == id end)
+    end)
+  end
+
   def replace(%Doc{} = doc, %{name: name} = type) do
     %{doc | share: Map.replace(doc.share, name, type)}
   end
@@ -195,6 +211,7 @@ defmodule Y.Doc do
   end
 
   def pack!(%Doc{share: share} = doc) do
+    # TODO Pack delete_set
     share =
       share
       |> Enum.map(fn {name, type} ->
@@ -202,12 +219,26 @@ defmodule Y.Doc do
       end)
       |> Enum.into(%{})
 
-   %{doc | share: share}
+    %{doc | share: share}
   end
 
   def apply_update(update, transaction) when is_bitstring(update) do
     update
     |> Decoder.decode(transaction)
+  end
+
+  def put_pending_structs(
+        %Transaction{doc: %Doc{} = doc} = transaction,
+        %{structs: _, missing_sv: _} = pending_structs
+      ) do
+    %{transaction | doc: %{doc | pending_structs: pending_structs}}
+  end
+
+  def put_pending_delete_sets(
+        %Transaction{doc: %Doc{} = doc} = transaction,
+        %{} = pending_delete_sets
+      ) do
+    %{transaction | doc: %{doc | pending_delete_sets: pending_delete_sets}}
   end
 
   def get_instance(%Doc{name: name}), do: get_instance(name)
@@ -247,6 +278,7 @@ defmodule Y.Doc do
       {:ok, %Transaction{} = new_transaction} ->
         new_transaction =
           new_transaction
+          |> Transaction.finalize()
           |> Transaction.cleanup()
 
         {:reply, {:ok, name}, new_transaction.doc}

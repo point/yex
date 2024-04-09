@@ -8,6 +8,8 @@ defmodule Y.Type.Array do
   alias Y.Item
   alias Y.ID
 
+  require Logger
+
   defstruct tree: nil,
             doc_name: nil,
             name: nil
@@ -43,7 +45,8 @@ defmodule Y.Type.Array do
     end
   end
 
-  def to_list(array), do: Type.to_list(array, as_items: false)
+  # def to_list(array), do: Type.to_list(array, as_items: false)
+  defdelegate to_list(array), to: Type
   defdelegate to_list(array, opts), to: Type
 
   defdelegate find(array, id, default \\ nil), to: Type
@@ -59,6 +62,53 @@ defmodule Y.Type.Array do
       end)
 
     %Array{doc_name: u.doc_name, name: u.name, tree: tree}
+  end
+
+  def length(%Array{tree: tree}), do: ArrayTree.length(tree)
+
+  def at(%Array{tree: tree}, index), do: ArrayTree.at(tree, index)
+
+  def delete(array, transaction, index, length \\ 1)
+  def delete(%Array{} = _array, %Transaction{} = transaction, _index, 0), do: {:ok, transaction}
+
+  def delete(%Array{tree: tree} = array, %Transaction{} = transaction, index, length) do
+    case ArrayTree.at(tree, index) do
+      nil ->
+        Logger.warning("Fail to find item to delete at position", array: array, index: index)
+        {:ok, transaction}
+
+      %Item{} = starting_item ->
+        do_delete(array, transaction, starting_item, length)
+    end
+  end
+
+  def delete_by_id(%Array{tree: tree} = array, %Transaction{} = transaction, %ID{} = id) do
+    case ArrayTree.find(tree, id) do
+      nil ->
+        Logger.warning("Fail to find item to delete", array: array, id: id)
+        {:ok, transaction}
+
+      %Item{} = starting_item ->
+        do_delete(array, transaction, starting_item, 1)
+    end
+  end
+
+  defp do_delete(array, transaction, starting_item, length) do
+    case ArrayTree.transform(array.tree, starting_item, 0, fn item, pos ->
+           if pos < length, do: {Item.delete(item), pos + 1}
+         end) do
+      {:ok, new_array_tree} ->
+        Transaction.update(transaction, %Array{array | tree: new_array_tree})
+
+      _ ->
+        Logger.warning("Fail to delete item(s)",
+          array: array,
+          starting_item: starting_item,
+          length: length
+        )
+
+        {:ok, transaction}
+    end
   end
 
   defp do_put_many(
@@ -110,10 +160,24 @@ defmodule Y.Type.Array do
       %{array | tree: new_tree}
     end
 
-    def to_list(%Array{tree: tree}, as_items: false),
-      do: tree |> ArrayTree.to_list() |> Enum.map(& &1.content) |> List.flatten()
+    def to_list(%Array{tree: tree}, opts \\ []) do
+      as_items = Keyword.get(opts, :as_items, false)
+      with_deleted = Keyword.get(opts, :with_deleted, false)
 
-    def to_list(%Array{tree: tree}, as_items: true), do: tree |> ArrayTree.to_list()
+      items =
+        if with_deleted do
+          ArrayTree.to_list(tree)
+        else
+          ArrayTree.to_list(tree) |> Enum.reject(& &1.deleted?)
+        end
+
+      if as_items, do: items, else: items |> Enum.map(& &1.content) |> List.flatten()
+    end
+
+    # def to_list(%Array{tree: tree}, as_items: false),
+    #   do: tree |> ArrayTree.to_list() |> Enum.map(& &1.content) |> List.flatten()
+    #
+    # def to_list(%Array{tree: tree}, as_items: true), do: tree |> ArrayTree.to_list()
 
     def find(%Array{tree: tree}, %ID{} = id, default), do: tree |> ArrayTree.find(id, default)
 
@@ -175,6 +239,36 @@ defmodule Y.Type.Array do
 
     def last(%Array{tree: tree}) do
       ArrayTree.last(tree)
+    end
+
+    defdelegate delete(array, transaction, id), to: Y.Type.Array, as: :delete_by_id
+  end
+
+  defimpl Enumerable do
+    def count(_) do
+      {:error, __MODULE__}
+    end
+
+    def member?(_array, _element) do
+      {:error, __MODULE__}
+    end
+
+    def reduce(array, acc, fun)
+
+    def reduce(%Array{tree: tree}, {:cont, acc}, fun) do
+      Enumerable.reduce(tree, {:cont, acc}, fun)
+    end
+
+    def reduce(_array, {:halt, acc}, _fun) do
+      {:halted, acc}
+    end
+
+    def reduce(array, {:suspend, acc}, fun) do
+      {:suspended, acc, &reduce(array, &1, fun)}
+    end
+
+    def slice(_array) do
+      {:error, __MODULE__}
     end
   end
 end

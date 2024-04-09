@@ -270,4 +270,98 @@ defmodule Y.ArrayTest do
     assert Enum.map(items, fn %{id: %{clock: c}} -> c end) |> Enum.sort() ==
              Enum.to_list(3..6)
   end
+
+  test "slice (Enumerable protocol)" do
+    {:ok, doc} = Doc.new(name: :doc_slice)
+    {:ok, array} = Doc.get_array(doc, "array")
+
+    assert {:ok, array} =
+             doc
+             |> Doc.transact!(fn transaction ->
+               with {:ok, _array, transaction} <-
+                      Enum.reduce(1..20, Array.put(array, transaction, 0, 0), fn i, acc ->
+                        Array.put(acc, i, i)
+                      end) do
+                 {:ok, transaction}
+               end
+             end)
+             |> Doc.get("array")
+
+    assert Enum.to_list(0..40//2) ==
+             Enum.map(array, fn %Item{content: [content]} -> content * 2 end)
+  end
+
+  test "length + at" do
+    {:ok, doc} = Doc.new(name: :doc_length)
+    {:ok, array} = Doc.get_array(doc, "array")
+    {:ok, empty_array} = Doc.get_array(doc, "empty_array")
+
+    assert {:ok, array} =
+             doc
+             |> Doc.transact!(fn transaction ->
+               with {:ok, _array, transaction} <-
+                      Enum.reduce(1..9, Array.put(array, transaction, 0, 0), fn i, acc ->
+                        Array.put(acc, i, i)
+                      end) do
+                 {:ok, transaction}
+               end
+             end)
+             |> Doc.get("array")
+
+    assert 10 = Array.length(array)
+    assert 0 = Array.length(empty_array)
+
+    assert %Item{content: [0]} = Array.at(array, 0)
+    assert %Item{content: [1]} = Array.at(array, 1)
+    assert %Item{content: [9]} = Array.at(array, 9)
+    assert nil == Array.at(array, 10)
+
+    assert nil == Array.at(empty_array, 0)
+    assert nil == Array.at(empty_array, 1)
+  end
+
+  test "delete" do
+    {:ok, doc} = Doc.new(name: :doc_delete)
+    {:ok, array} = Doc.get_array(doc, "array")
+
+    assert {:ok, _} =
+             doc
+             |> Doc.transact(fn transaction ->
+               with {:ok, _array, transaction} <-
+                      Enum.reduce(1..9, Array.put(array, transaction, 0, 0), fn i, acc ->
+                        Array.put(acc, i, i)
+                      end) do
+                 {:ok, transaction}
+               end
+             end)
+
+    assert {:ok, array} =
+             doc
+             |> Doc.transact!(fn transaction ->
+               with {:ok, array} <- Doc.get(transaction, "array"),
+                    {:ok, _transaction} = res <- Array.delete(array, transaction, 5),
+                    do: res
+             end)
+             |> Doc.get("array")
+
+    assert %Item{content: [5]} =
+             Enum.find(Array.to_list(array, as_items: true, with_deleted: true), fn item ->
+               item.deleted?
+             end)
+
+    assert {:ok, array} =
+             doc
+             |> Doc.transact!(fn transaction ->
+               with {:ok, array} <- Doc.get(transaction, "array"),
+                    {:ok, _transaction} = res <- Array.delete(array, transaction, 6, 8),
+                    do: res
+             end)
+             |> Doc.get("array")
+
+    # 5th in original array is deleted =>
+    # array[6] == 7
+    # array[7] == 8
+    # array[8] == 9
+    assert [0, 1, 2, 3, 4, 6] = Array.to_list(array)
+  end
 end

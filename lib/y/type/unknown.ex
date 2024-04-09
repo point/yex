@@ -4,6 +4,9 @@ defmodule Y.Type.Unknown do
   alias Y.Type
   alias Y.Item
   alias Y.ID
+  alias Y.Transaction
+
+  require Logger
 
   defstruct doc_name: nil,
             name: nil,
@@ -131,6 +134,17 @@ defmodule Y.Type.Unknown do
       case Enum.find_index(items, &(&1 == before_item)) do
         nil -> {:error, "Before item not found"}
         index -> {:ok, %{type | items: List.insert_at(items, index, item)}}
+      end
+    end
+
+    def delete(%Unknown{items: items} = type, %Transaction{} = transaction, %ID{} = id) do
+      case Enum.find(items, &(&1.id == id)) do
+        nil ->
+          Logger.warning("Fail to find item to delete", items: items, id: id)
+          {:ok, transaction}
+
+        %Item{} = item ->
+          Transaction.update(transaction, %Unknown{type | items: List.delete(items, item)})
       end
     end
 

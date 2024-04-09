@@ -101,7 +101,7 @@ defmodule Y.Encoder do
     |> write(:length, len - offset)
     |> then(fn buf ->
       content
-      |> Enum.slice(offset..-1)
+      |> Enum.slice(offset..-1//1)
       |> Enum.reduce(buf, &write_any_content(&2, &1))
     end)
   end
@@ -156,12 +156,26 @@ defmodule Y.Encoder do
     end
   end
 
-  defp write_delete_set(buffer, _doc, _sm) do
-    # Enum.reduce(sm, buffer, fn {client, _clock}, buffer ->
-    #   items = Doc.items_of_client!(doc, client)
-    #
-    # end)
-    ds = %{}
-    buffer |> write(:rest, write_uint(map_size(ds)))
+  defp write_delete_set(buffer, doc, _sm) do
+    ds = doc.delete_set
+    buffer = buffer |> write(:rest, write_uint(map_size(ds)))
+
+    ds
+    |> Enum.sort(fn {_, a}, {_, b} -> MapSet.to_list(a) |> hd() >= MapSet.to_list(b) |> hd() end)
+    |> Enum.reduce(buffer, fn {client, delete_items}, buffer ->
+      delete_items = MapSet.to_list(delete_items)
+
+      buffer
+      |> Buffer.reset_delete_set_current_value()
+      |> write(:rest, write_uint(client))
+      |> write(:rest, write_uint(length(delete_items)))
+      |> then(fn buf ->
+        Enum.reduce(delete_items, buf, fn {clock, length}, buf ->
+          buf
+          |> write(:ds_clock, clock)
+          |> write(:ds_length, length)
+        end)
+      end)
+    end)
   end
 end
