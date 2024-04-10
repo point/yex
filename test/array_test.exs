@@ -288,7 +288,7 @@ defmodule Y.ArrayTest do
              |> Doc.get("array")
 
     assert Enum.to_list(0..40//2) ==
-             Enum.map(array, fn %Item{content: [content]} -> content * 2 end)
+             Enum.map(array, fn c -> c * 2 end)
   end
 
   test "length + at" do
@@ -363,5 +363,31 @@ defmodule Y.ArrayTest do
     # array[7] == 8
     # array[8] == 9
     assert [0, 1, 2, 3, 4, 6] = Array.to_list(array)
+  end
+
+  test "enumerable protocol" do
+    {:ok, doc} = Doc.new(name: :doc_enumerable)
+    {:ok, array} = Doc.get_array(doc, "array")
+
+    assert [] = Enum.slice(array, 1..3)
+
+    assert {:ok, _} =
+             Doc.transact(doc, fn transaction ->
+               {:ok, array, transaction} = Array.put(array, transaction, 0, 0)
+               {:ok, transaction} = Array.delete(array, transaction, 0)
+               {:ok, array} = Doc.get(transaction, "array")
+               assert [] = Enum.slice(array, 1..3)
+
+               {:ok, array, transaction} =
+                 Enum.reduce(1..9, Array.put(array, transaction, 0, 0), fn i, acc ->
+                   Array.put(acc, i, i)
+                 end)
+
+               {:ok, transaction} = Array.delete(array, transaction, 2)
+               {:ok, array} = Doc.get(transaction, "array")
+               assert [1, 3, 4] = Enum.slice(array, 1..3)
+
+               {:ok, transaction}
+             end)
   end
 end

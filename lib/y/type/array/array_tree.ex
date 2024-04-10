@@ -338,6 +338,8 @@ defmodule Y.Type.Array.ArrayTree do
 
   def first(%ArrayTree{ft: tree}), do: FingerTree.first(tree)
   def last(%ArrayTree{ft: tree}), do: FingerTree.last(tree)
+  def rest(%ArrayTree{ft: tree} = array_tree), do: %{array_tree | ft: FingerTree.rest(tree)}
+  def butlast(%ArrayTree{ft: tree} = array_tree), do: %{array_tree | ft: FingerTree.butlast(tree)}
 
   def length(%ArrayTree{ft: tree}) do
     %Meter{len: len} = FingerTree.measure(tree)
@@ -448,7 +450,7 @@ defmodule Y.Type.Array.ArrayTree do
       {:suspended, acc, &reduce(array, &1, fun)}
     end
 
-    def slice(_array) do
+    def slice(_) do
       {:error, __MODULE__}
     end
   end

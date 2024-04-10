@@ -253,10 +253,52 @@ defmodule Y.Type.Array do
       {:error, __MODULE__}
     end
 
+    # def reduce0(%Array{tree: tree} = array, {:cont, acc}, fun) do
+    #   reduce_item = fn
+    #     _, {:halt, acc}, _, _ ->
+    #       {:halted, acc}
+    #
+    #     [], {:cont, acc}, _fun, _ ->
+    #       {:cont, acc}
+    #
+    #     [c | rest], {:cont, acc}, fun, reduce_item ->
+    #       reduce_item.(rest, fun.(c, acc), fun, reduce_item)
+    #   end
+    #
+    #   case ArrayTree.first(tree) do
+    #     nil ->
+    #       {:done, acc}
+    #
+    #     %{deleted?: true} ->
+    #       reduce(%{array | tree: ArrayTree.rest(tree)}, {:cont, acc}, fun)
+    #
+    #     %{content: content} ->
+    #       reduce(
+    #         %{array | tree: ArrayTree.rest(tree)},
+    #         reduce_item.(content, {:cont, acc}, fun, reduce_item),
+    #         fun
+    #       )
+    #   end
+    # end
+
     def reduce(array, acc, fun)
 
     def reduce(%Array{tree: tree}, {:cont, acc}, fun) do
-      Enumerable.reduce(tree, {:cont, acc}, fun)
+      Enumerable.reduce(tree, {:cont, acc}, fn
+        nil, acc ->
+          {:done, acc}
+
+        %{deleted?: true}, acc ->
+          {:cont, acc}
+
+        %{content: content}, acc ->
+          Enum.reduce_while(content, {:cont, acc}, fn c, {_, acc} ->
+            case fun.(c, acc) do
+              {:cont, _acc} = r -> {:cont, r}
+              {:halt, _acc} = r -> {:halt, r}
+            end
+          end)
+      end)
     end
 
     def reduce(_array, {:halt, acc}, _fun) do
@@ -267,7 +309,7 @@ defmodule Y.Type.Array do
       {:suspended, acc, &reduce(array, &1, fun)}
     end
 
-    def slice(_array) do
+    def slice(_) do
       {:error, __MODULE__}
     end
   end
