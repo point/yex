@@ -94,12 +94,14 @@ defmodule Y.Type.Array do
   end
 
   defp do_delete(array, transaction, starting_item, length) do
-    case ArrayTree.transform(array.tree, starting_item, 0, fn item, pos ->
-           if pos < length, do: {Item.delete(item), pos + 1}
-         end) do
-      {:ok, new_array_tree} ->
-        Transaction.update(transaction, %Array{array | tree: new_array_tree})
-
+    with {:ok, new_array_tree} <-
+           ArrayTree.transform(array.tree, starting_item, 0, fn item, pos ->
+             if pos < length, do: {Item.delete(item), pos + 1}
+           end),
+         {:ok, transaction} <-
+           Transaction.update(transaction, %Array{array | tree: new_array_tree}) do
+      {:ok, %{array | tree: new_array_tree}, transaction}
+    else
       _ ->
         Logger.warning("Fail to delete item(s)",
           array: array,
@@ -107,7 +109,7 @@ defmodule Y.Type.Array do
           length: length
         )
 
-        {:ok, transaction}
+        {:error, array, transaction}
     end
   end
 

@@ -339,8 +339,8 @@ defmodule Y.ArrayTest do
              doc
              |> Doc.transact!(fn transaction ->
                with {:ok, array} <- Doc.get(transaction, "array"),
-                    {:ok, _transaction} = res <- Array.delete(array, transaction, 5),
-                    do: res
+                    {:ok, _array, transaction} <- Array.delete(array, transaction, 5),
+                    do: {:ok, transaction}
              end)
              |> Doc.get("array")
 
@@ -353,8 +353,8 @@ defmodule Y.ArrayTest do
              doc
              |> Doc.transact!(fn transaction ->
                with {:ok, array} <- Doc.get(transaction, "array"),
-                    {:ok, _transaction} = res <- Array.delete(array, transaction, 6, 8),
-                    do: res
+                    {:ok, _array, transaction} <- Array.delete(array, transaction, 6, 8),
+                    do: {:ok, transaction}
              end)
              |> Doc.get("array")
 
@@ -374,8 +374,7 @@ defmodule Y.ArrayTest do
     assert {:ok, _} =
              Doc.transact(doc, fn transaction ->
                {:ok, array, transaction} = Array.put(array, transaction, 0, 0)
-               {:ok, transaction} = Array.delete(array, transaction, 0)
-               {:ok, array} = Doc.get(transaction, "array")
+               {:ok, array, transaction} = Array.delete(array, transaction, 0)
                assert [] = Enum.slice(array, 1..3)
 
                {:ok, array, transaction} =
@@ -383,8 +382,7 @@ defmodule Y.ArrayTest do
                    Array.put(acc, i, i)
                  end)
 
-               {:ok, transaction} = Array.delete(array, transaction, 2)
-               {:ok, array} = Doc.get(transaction, "array")
+               {:ok, array, transaction} = Array.delete(array, transaction, 2)
                assert [1, 3, 4] = Enum.slice(array, 1..3)
 
                {:ok, transaction}

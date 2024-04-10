@@ -921,7 +921,7 @@ defmodule Y.Decoder do
 
   defp do_mark_as_deleted(transaction, type, client, clock, clock_end) do
     case Type.delete(type, transaction, ID.new(client, clock)) do
-      {:ok, transaction} -> do_mark_as_deleted(transaction, type, client, clock + 1, clock_end)
+      {:ok, _, transaction} -> do_mark_as_deleted(transaction, type, client, clock + 1, clock_end)
       _ -> transaction
     end
   end
