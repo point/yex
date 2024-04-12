@@ -2,6 +2,7 @@ defmodule Y.Doc do
   alias __MODULE__
   alias Y.Type
   alias Y.ID
+  alias Y.Item
   alias Y.Type.Array
   alias Y.Type.Unknown
   alias Y.Transaction
@@ -203,7 +204,17 @@ defmodule Y.Doc do
   end
 
   def replace(%Doc{} = doc, %{name: name} = type) do
-    %{doc | share: Map.replace(doc.share, name, type)}
+    share =
+      doc.share
+      |> Enum.map(fn {d_name, d_type} ->
+        case d_name do
+          ^name -> {name, type}
+          _ -> {d_name, replace_recursively(d_type, type)}
+        end
+      end)
+      |> Enum.into(%{})
+
+    %{doc | share: share}
   end
 
   def pack(%Transaction{doc: %Doc{} = doc} = transaction) do
@@ -305,5 +316,31 @@ defmodule Y.Doc do
       ],
       opts
     )
+  end
+
+  defp replace_recursively(type, %{name: name} = with_type) do
+    type
+    |> Type.to_list(with_deleted: true, as_items: true)
+    |> Enum.reduce(type, fn
+      %Item{content: [%_{name: ^name} = c]} = item, type when c != with_type ->
+        case Type.unsafe_replace(type, item, [%Item{item | content: [with_type]}]) do
+          {:ok, new_type} -> new_type
+          _ -> type
+        end
+
+      %Item{content: [%_{} = content]} = item, type ->
+        with impl when is_atom(impl) <- Type.impl_for(item),
+             {:ok, new_type} <-
+               Type.unsafe_replace(type, item, [
+                 %Item{item | content: [replace_recursively(content, with_type)]}
+               ]) do
+          new_type
+        else
+          _ -> type
+        end
+
+      _item, type ->
+        type
+    end)
   end
 end

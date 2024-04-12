@@ -45,7 +45,6 @@ defmodule Y.Type.Array do
     end
   end
 
-  # def to_list(array), do: Type.to_list(array, as_items: false)
   defdelegate to_list(array), to: Type
   defdelegate to_list(array, opts), to: Type
 
@@ -75,7 +74,7 @@ defmodule Y.Type.Array do
     case ArrayTree.at(tree, index) do
       nil ->
         Logger.warning("Fail to find item to delete at position", array: array, index: index)
-        {:ok, transaction}
+        {:ok, array, transaction}
 
       %Item{} = starting_item ->
         do_delete(array, transaction, starting_item, length)
@@ -176,11 +175,6 @@ defmodule Y.Type.Array do
       if as_items, do: items, else: items |> Enum.map(& &1.content) |> List.flatten()
     end
 
-    # def to_list(%Array{tree: tree}, as_items: false),
-    #   do: tree |> ArrayTree.to_list() |> Enum.map(& &1.content) |> List.flatten()
-    #
-    # def to_list(%Array{tree: tree}, as_items: true), do: tree |> ArrayTree.to_list()
-
     def find(%Array{tree: tree}, %ID{} = id, default), do: tree |> ArrayTree.find(id, default)
 
     def unsafe_replace(
@@ -202,7 +196,10 @@ defmodule Y.Type.Array do
           {:error, "Total content length of items != length of item to replace"}
 
         :otherwise ->
-          %{array | tree: ArrayTree.replace(tree, item, with_items)}
+          case ArrayTree.replace(tree, item, with_items) do
+            {:ok, new_tree} -> {:ok, %{array | tree: new_tree}}
+            err -> err
+          end
       end
     end
 

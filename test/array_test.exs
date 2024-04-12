@@ -324,6 +324,11 @@ defmodule Y.ArrayTest do
     {:ok, doc} = Doc.new(name: :doc_delete)
     {:ok, array} = Doc.get_array(doc, "array")
 
+    Doc.transact(doc, fn transaction ->
+      assert {:ok, _, transaction} = Array.delete(array, transaction, 0)
+      {:ok, transaction}
+    end)
+
     assert {:ok, _} =
              doc
              |> Doc.transact(fn transaction ->
@@ -378,14 +383,82 @@ defmodule Y.ArrayTest do
                assert [] = Enum.slice(array, 1..3)
 
                {:ok, array, transaction} =
-                 Enum.reduce(1..9, Array.put(array, transaction, 0, 0), fn i, acc ->
-                   Array.put(acc, i, i)
-                 end)
+                 Array.put_many(array, transaction, 0, Enum.to_list(0..9))
 
                {:ok, array, transaction} = Array.delete(array, transaction, 2)
                assert [1, 3, 4] = Enum.slice(array, 1..3)
 
                {:ok, transaction}
              end)
+  end
+
+  test "concurrent write" do
+    {:ok, doc} = Doc.new(name: :doc_concurrent)
+    {:ok, _array} = Doc.get_array(doc, "array")
+
+    t1 =
+      Task.async(fn ->
+        Doc.transact(doc, fn transaction ->
+          assert {:ok, array} = Doc.get(transaction, "array")
+          assert {:ok, _array, transaction} = Array.put(array, transaction, 0, 1)
+          {:ok, transaction}
+        end)
+      end)
+
+    t2 =
+      Task.async(fn ->
+        Doc.transact(doc, fn transaction ->
+          assert {:ok, array} = Doc.get(transaction, "array")
+          assert {:ok, _array, transaction} = Array.put(array, transaction, 0, 2)
+          {:ok, transaction}
+        end)
+      end)
+
+    Task.await_many([t1, t2])
+
+    {:ok, array} = Doc.get(doc, "array")
+    assert [1, 2] == Array.to_list(array) |> Enum.sort()
+  end
+
+  test "nested arrays" do
+    {:ok, doc} = Doc.new(name: :doc_nested)
+    {:ok, array} = Doc.get_array(doc, "array")
+    {:ok, nested} = Doc.get_array(doc, "nested")
+    {:ok, _nested2} = Doc.get_array(doc, "nested2")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, nested, transaction} = Array.put(nested, transaction, 0, 0)
+      {:ok, _, transaction} = Array.put(array, transaction, 0, nested)
+      {:ok, transaction}
+    end)
+
+    {:ok, array} = Doc.get(doc, "array")
+    assert [0] = Enum.at(array, 0) |> Array.to_list()
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, nested} = Doc.get(transaction, "nested")
+      {:ok, _, transaction} = Array.put(nested, transaction, 1, 1)
+      {:ok, transaction}
+    end)
+
+    {:ok, array} = Doc.get(doc, "array")
+    assert [0, 1] = Enum.at(array, 0) |> Array.to_list()
+
+    # 2 level nesting
+    Doc.transact(doc, fn transaction ->
+      {:ok, nested} = Doc.get(transaction, "nested")
+      {:ok, nested2} = Doc.get(transaction, "nested2")
+      {:ok, _, transaction} = Array.put(nested, transaction, 2, nested2)
+      {:ok, transaction}
+    end)
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, nested2} = Doc.get(transaction, "nested2")
+      {:ok, _, transaction} = Array.put(nested2, transaction, 0, 2)
+      {:ok, transaction}
+    end)
+
+    {:ok, array} = Doc.get(doc, "array")
+    assert 2 == Enum.at(array, 0) |> Enum.at(2) |> Enum.at(0)
   end
 end
