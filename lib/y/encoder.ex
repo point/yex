@@ -40,22 +40,29 @@ defmodule Y.Encoder do
       end
 
     Enum.reduce(sm, buffer, fn {client, clock}, buffer ->
-      [%_{id: %ID{clock: f_clock}} | _] = items = Doc.items_of_client!(doc, client)
+      case Doc.items_of_client!(doc, client) do
+        [] ->
+          buffer
+          |> write(:rest, write_uint(0))
+          |> write(:client, client)
+          |> write(:rest, write_uint(clock))
 
-      clock = max(clock, f_clock)
+        [%_{id: %ID{clock: f_clock}} | _] = items ->
+          clock = max(clock, f_clock)
 
-      buffer
-      |> write(:rest, write_uint(length(items)))
-      |> write(:client, client)
-      |> write(:rest, write_uint(clock))
-      |> then(fn buf ->
-        items
-        |> Enum.with_index()
-        |> Enum.reduce(buf, fn
-          {item, 0}, buf -> write_item(buf, item, clock - f_clock)
-          {item, _}, buf -> write_item(buf, item)
-        end)
-      end)
+          buffer
+          |> write(:rest, write_uint(length(items)))
+          |> write(:client, client)
+          |> write(:rest, write_uint(clock))
+          |> then(fn buf ->
+            items
+            |> Enum.with_index()
+            |> Enum.reduce(buf, fn
+              {item, 0}, buf -> write_item(buf, item, clock - f_clock)
+              {item, _}, buf -> write_item(buf, item)
+            end)
+          end)
+      end
     end)
   end
 

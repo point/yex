@@ -76,7 +76,7 @@ defmodule Y.Transaction do
   end
 
   defp put_deleted_to_delete_set(delete_set, type, type_before) do
-    Enum.reduce(type, delete_set, fn
+    Enum.reduce(Type.to_list(type, as_items: true, with_deleted: true), delete_set, fn
       %Item{deleted?: true} = item, ds ->
         case Type.find(type_before, item.id) do
           %Item{deleted?: false} ->

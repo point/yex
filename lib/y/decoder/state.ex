@@ -58,15 +58,15 @@ defmodule Y.Decoder.State do
   end
 
   def read_ds_clock(%State{} = state, f) do
-    {clock, state} = f.(Map.fetch!(state, :rest))
+    {clock, new_msg} = f.(Map.fetch!(state, :rest))
     clock = state.delete_set_cur_val + clock
-    {clock, %{state | delete_set_cur_val: clock}}
+    {clock, %{state | delete_set_cur_val: clock, rest: new_msg}}
   end
 
   def read_ds_len(%State{} = state, f) do
-    {diff, state} = f.(Map.fetch!(state, :rest))
+    {diff, new_msg} = f.(Map.fetch!(state, :rest))
     diff = diff + 1
-    {diff, %{state | delete_set_cur_val: state.delete_set_cur_val + diff}}
+    {diff, %{state | delete_set_cur_val: state.delete_set_cur_val + diff, rest: new_msg}}
   end
 
   def reset_ds_cur_val(%State{} = state), do: %{state | delete_set_cur_val: 0}

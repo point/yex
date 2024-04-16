@@ -223,6 +223,9 @@ defmodule Y.Decoder do
               )
         })
 
+      {:skip, new_transaction} ->
+        do_integrate(rest_items, items_to_retry, %{internal_state | transaction: new_transaction})
+
       err ->
         Logger.warning("Failed to integrate single item", item: item, error: err)
         do_integrate(rest_items, items_to_retry, internal_state)
@@ -312,9 +315,16 @@ defmodule Y.Decoder do
     {c, s, buf} =
       if count == 0 do
         {s, buf} = read_int(buf)
-        c = 1
-        {s, {c, buf}} = if s < 0, do: {-s, read_uint(buf)}, else: {s, {c, buf}}
-        {c + 2, s, buf}
+
+        {s, {c, buf}} =
+          if s < 0 do
+            {c, buf} = read_uint(buf)
+            {-s, {c + 2, buf}}
+          else
+            {s, {1, buf}}
+          end
+
+        {c, s, buf}
       else
         {count, s, buf}
       end
@@ -352,7 +362,7 @@ defmodule Y.Decoder do
           {c, buf} = read_uint(buf)
           {c + 2, -s, buf}
         else
-          {c, s, buf}
+          {1, s, buf}
         end
       else
         {c, s, buf}
@@ -373,14 +383,13 @@ defmodule Y.Decoder do
         {diff, buf} = read_int(buf)
         has_count? = (diff &&& 1) != 0
         diff = floor(diff / 2)
-        c = 1
 
         {c, buf} =
           if has_count? do
             {c, buf} = read_uint(buf)
             {c + 2, buf}
           else
-            {c, buf}
+            {1, buf}
           end
 
         {c, diff, buf}
@@ -391,9 +400,9 @@ defmodule Y.Decoder do
     s = s + diff
 
     if which_clock? == :left do
-      {s, %{state | left_clock: %{state.left_clock | buf: buf, s: s, count: c, diff: diff}}}
+      {s, %{state | left_clock: %{state.left_clock | buf: buf, s: s, count: c - 1, diff: diff}}}
     else
-      {s, %{state | right_clock: %{state.right_clock | buf: buf, s: s, count: c, diff: diff}}}
+      {s, %{state | right_clock: %{state.right_clock | buf: buf, s: s, count: c - 1, diff: diff}}}
     end
   end
 
@@ -422,7 +431,7 @@ defmodule Y.Decoder do
 
   # read deleted content
   defp read_content(1, state) do
-    {len, state} = State.read_and_advance(state, :rest, &read_uint/1)
+    {len, state} = read_len(state)
     {Y.Content.Deleted.new(len), state}
   end
 

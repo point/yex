@@ -186,7 +186,7 @@ defmodule Y.Doc do
     |> Map.values()
     |> Enum.flat_map(fn type ->
       type
-      |> Type.to_list(as_items: true)
+      |> Type.to_list(as_items: true, with_deleted: true)
       |> Enum.filter(fn %_{id: %ID{client: c}} -> c == client end)
       |> Enum.sort_by(fn %_{id: %ID{clock: clock}} -> clock end)
     end)

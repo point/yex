@@ -214,8 +214,12 @@ defmodule Y.Type.Array do
       end
     end
 
-    def add_before(%Array{tree: tree} = array, nil, %Item{} = item),
-      do: {:ok, %{array | tree: ArrayTree.put(tree, 0, item)}}
+    def add_before(%Array{tree: tree} = array, nil, %Item{} = item) do
+      case ArrayTree.put(tree, 0, item) do
+        {:ok, tree} -> {:ok, %{array | tree: tree}}
+        err -> err
+      end
+    end
 
     def add_before(%Array{tree: tree} = array, %Item{} = before_item, %Item{} = item) do
       case ArrayTree.add_before(tree, before_item, item) do

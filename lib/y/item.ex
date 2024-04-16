@@ -174,7 +174,7 @@ defmodule Y.Item do
           )
 
         :otherwise ->
-          {:error, "Cannot integrate item"}
+          {:error, "Cannot integrate item. Left item or right item missing"}
       end
     else
       {:invalid, transaction}

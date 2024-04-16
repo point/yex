@@ -46,7 +46,14 @@ defmodule Y.Type.Array.ArrayTree do
   end
 
   def put(%ArrayTree{ft: %EmptyTree{} = tree} = array_tree, _index, %Item{} = item) do
-    {:ok, %ArrayTree{array_tree | ft: FingerTree.cons(tree, item)}}
+    items = Item.explode(item) |> Enum.reverse()
+
+    tree =
+      Enum.reduce(items, tree, fn item, tree ->
+        FingerTree.cons(tree, item)
+      end)
+
+    {:ok, %ArrayTree{array_tree | ft: tree}}
   end
 
   def put(
@@ -137,7 +144,11 @@ defmodule Y.Type.Array.ArrayTree do
 
   def to_list(%ArrayTree{ft: tree}), do: FingerTree.to_list(tree)
 
-  def find(%ArrayTree{ft: tree}, id, default \\ nil) do
+  def find(tree, id, default \\ nil)
+
+  def find(%ArrayTree{ft: %EmptyTree{}}, _id, default), do: default
+
+  def find(%ArrayTree{ft: tree}, id, default) do
     {l, v, _} =
       FingerTree.split(tree, fn %{highest_clocks: clocks} ->
         case Map.fetch(clocks, id.client) do
@@ -208,12 +219,12 @@ defmodule Y.Type.Array.ArrayTree do
     end
   end
 
-  def do_transform(nil, left_tree, right_tree, _acc, _fun), do: {left_tree, right_tree}
+  defp do_transform(nil, left_tree, right_tree, _acc, _fun), do: {left_tree, right_tree}
 
-  def do_transform(_, left_tree, nil, _acc, _fun),
+  defp do_transform(_, left_tree, nil, _acc, _fun),
     do: {left_tree, nil}
 
-  def do_transform(%Item{} = item, left_tree, right_tree, acc, fun) do
+  defp do_transform(%Item{} = item, left_tree, right_tree, acc, fun) do
     case fun.(item, acc) do
       {%Item{} = new_item, new_acc} ->
         do_transform(

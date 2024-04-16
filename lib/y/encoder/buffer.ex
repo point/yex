@@ -62,7 +62,8 @@ defmodule Y.Encoder.Buffer do
   end
 
   def write(%Buffer{} = b, :ds_length, length) do
-    %{b | delete_set_cur_val: b.delete_set_cur_val + length} |> write(:rest, length - 1)
+    %{b | delete_set_cur_val: b.delete_set_cur_val + length}
+    |> write(:rest, write_uint(length - 1))
   end
 
   def write(%Buffer{} = b, key, what) do
@@ -87,18 +88,6 @@ defmodule Y.Encoder.Buffer do
     |> Kernel.<>(write_bitstring(type_ref))
     |> Kernel.<>(Bufferable.dump(b.length) |> write_bitstring())
     |> Kernel.<>(b.rest)
-
-    # <>
-    #   Bufferable.dump(b.client) <>
-    #   Bufferable.dump(b.left_clock) <>
-    #   Bufferable.dump(b.right_clock) <>
-    #   Bufferable.dump(b.info) <>
-    # <<byte_size(b.string), b.string::binary>> <>
-    #     <<>>
-    # Bufferable.dump(b.parent_info) <>
-    # <<byte_size(type_ref), type_ref::binary>> <>
-    # Bufferable.dump(b.length) <>
-    # <<byte_size(b.rest), b.rest::binary>>
   end
 end
 

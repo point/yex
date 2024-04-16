@@ -10,9 +10,9 @@ defmodule Y.Encoder.Operations do
   end
 
   def write_int(acc \\ <<>>, num) do
-    cont? = if num > 63, do: 128, else: 0
     neg? = if num < 0, do: 64, else: 0
     num = if num < 0, do: -num, else: num
+    cont? = if num > 63, do: 128, else: 0
     acc = acc <> <<cont? ||| neg? ||| (63 &&& num)>>
 
     acc |> do_write_int(floor(num / 64))
