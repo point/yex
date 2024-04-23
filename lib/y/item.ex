@@ -25,13 +25,15 @@ defmodule Y.Item do
     origin = Keyword.get(opts, :origin)
     right_origin = Keyword.get(opts, :right_origin)
     parent_name = Keyword.get(opts, :parent_name)
+    parent_sub = Keyword.get(opts, :parent_sub)
 
     item = %Item{
       id: id,
       content: content,
       origin: origin,
       right_origin: right_origin,
-      parent_name: parent_name
+      parent_name: parent_name,
+      parent_sub: parent_sub
     }
 
     %{item | length: content_length(item)}
@@ -197,7 +199,7 @@ defmodule Y.Item do
           {:invalid, transaction}
 
         nil ->
-          case Type.add_before(type, Type.first(type), item) do
+          case Type.add_before(type, Type.first(type, item), item) do
             {:ok, updated_type} ->
               Transaction.update(transaction, updated_type)
 
@@ -315,13 +317,13 @@ defmodule Y.Item do
              %Item{} = o <- Type.next(type, item_left) do
           o
         else
-          _ -> Type.first(type)
+          _ -> Type.first(type, item)
         end
 
       end_range =
         case item_right do
           %Item{} -> item_right
-          _ -> Type.last(type)
+          _ -> Type.last(type, item)
         end
 
       with %Item{} <- start_range,

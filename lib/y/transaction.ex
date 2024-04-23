@@ -29,7 +29,7 @@ defmodule Y.Transaction do
       local: local
     }
 
-    %{t | before_state: Doc.highest_clock_with_length(t, :all)}
+    %{t | before_state: Doc.highest_clock_with_length(t)}
   end
 
   def update(transaction, type) do

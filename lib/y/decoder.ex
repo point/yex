@@ -24,7 +24,7 @@ defmodule Y.Decoder do
     ]
   end
 
-  def decode(msg, transaction) do
+  def apply(msg, transaction) do
     {_u, msg} = read_uint(msg)
     {key_clock, msg} = read_uint_array(msg)
     {client, msg} = read_uint_array(msg)

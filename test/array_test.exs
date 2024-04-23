@@ -461,4 +461,30 @@ defmodule Y.ArrayTest do
     {:ok, array} = Doc.get(doc, "array")
     assert 2 == Enum.at(array, 0) |> Enum.at(2) |> Enum.at(0)
   end
+
+  test "map in array" do
+    {:ok, doc} = Doc.new(name: :map_nested)
+    {:ok, array} = Doc.get_array(doc, "array")
+    {:ok, map} = Doc.get_map(doc, "map")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, map, transaction} = Y.Type.Map.put(map, transaction, "key", "value")
+      {:ok, _, transaction} = Array.put(array, transaction, 0, map)
+      {:ok, transaction}
+    end)
+
+    {:ok, array} = Doc.get(doc, "array")
+    assert %Y.Type.Map{} = map = Enum.at(array, 0)
+    assert "value" = Y.Type.Map.get(map, "key")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, map} = Doc.get(transaction, "map")
+      {:ok, _, transaction} = Y.Type.Map.put(map, transaction, "key", "new_value")
+      {:ok, transaction}
+    end)
+
+    {:ok, array} = Doc.get(doc, "array")
+    %Y.Type.Map{} = map = Enum.at(array, 0)
+    assert "new_value" = Y.Type.Map.get(map, "key")
+  end
 end

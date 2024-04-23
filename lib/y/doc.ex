@@ -82,6 +82,10 @@ defmodule Y.Doc do
     GenServer.call(doc_name, {:get_array, array_name})
   end
 
+  def get_map(doc_name, map_name \\ "") do
+    GenServer.call(doc_name, {:get_map, map_name})
+  end
+
   def transact(doc_name, f, opts \\ []) do
     GenServer.call(doc_name, {:transact, f, opts})
   end
@@ -117,35 +121,48 @@ defmodule Y.Doc do
     end
   end
 
-  def highest_clock(transaction, client_id \\ nil)
-
-  def highest_clock(%Transaction{doc: doc}, :all) do
-    Enum.reduce(Map.values(doc.share), %{}, fn t, acc ->
-      Map.merge(acc, Type.highest_clock(t, :all), fn _k, v1, v2 ->
-        max(v1, v2)
-      end)
-    end)
+  def highest_clock(%Transaction{doc: doc}, client_id \\ nil) do
+    highest_clock!(doc, client_id)
   end
 
-  def highest_clock(%Transaction{doc: doc}, client_id) do
-    client_id = client_id || doc.client_id
-
+  def highest_clock!(%Doc{} = doc, client_id \\ nil) do
     Enum.reduce(Map.values(doc.share), 0, fn t, acc ->
       max(acc, Type.highest_clock(t, client_id))
     end)
   end
 
-  def highest_clock_with_length(transaction, client_id \\ nil)
+  def highest_clock_by_client_id(%Transaction{doc: doc}), do: highest_clock_by_client_id!(doc)
 
-  def highest_clock_with_length(%Transaction{doc: doc}, :all) do
-    highest_clock_with_length!(doc)
+  def highest_clock_by_client_id!(%Doc{} = doc) do
+    Enum.reduce(Map.values(doc.share), %{}, fn t, acc ->
+      Map.merge(acc, Type.highest_clock_by_client_id(t), fn _k, v1, v2 ->
+        max(v1, v2)
+      end)
+    end)
   end
 
-  def highest_clock_with_length(%Transaction{doc: doc}, client_id) do
-    client_id = client_id || doc.client_id
+  def highest_clock_with_length(%Transaction{doc: doc}, client_id \\ nil) do
+    highest_clock_with_length!(doc, client_id)
+  end
 
+  @doc """
+  Make sure that %Doc{} = doc is not stale. 
+  Better to use highest_clock_with_length within transaction
+  """
+  def highest_clock_with_length!(%Doc{} = doc, client_id) do
     Enum.reduce(Map.values(doc.share), 0, fn t, acc ->
       max(acc, Type.highest_clock_with_length(t, client_id))
+    end)
+  end
+
+  def highest_clock_with_length_by_client_id(%Transaction{doc: doc}),
+    do: highest_clock_with_length_by_client_id!(doc)
+
+  def highest_clock_with_length_by_client_id!(%Doc{} = doc) do
+    Enum.reduce(Map.values(doc.share), %{}, fn t, acc ->
+      Map.merge(acc, Type.highest_clock_with_length_by_client_id(t), fn _k, v1, v2 ->
+        max(v1, v2)
+      end)
     end)
   end
 
@@ -169,18 +186,6 @@ defmodule Y.Doc do
     |> Enum.find_value(fn t -> Type.find(t, id, default) end)
   end
 
-  @doc """
-  Make sure that %Doc{} = doc is not stale. 
-  Better to use highest_clock_with_length within transaction
-  """
-  def highest_clock_with_length!(%Doc{} = doc) do
-    Enum.reduce(Map.values(doc.share), %{}, fn t, acc ->
-      Map.merge(acc, Type.highest_clock_with_length(t, :all), fn _k, v1, v2 ->
-        max(v1, v2)
-      end)
-    end)
-  end
-
   def items_of_client!(%Doc{} = doc, client) do
     doc.share
     |> Map.values()
@@ -195,7 +200,7 @@ defmodule Y.Doc do
   def type_with_id!(%Doc{} = doc, %ID{} = id) do
     doc.share
     |> Map.values()
-    |> Enum.filter(fn type -> Type.highest_clock_with_length(type, :all) >= id.clock end)
+    |> Enum.filter(fn type -> Type.highest_clock_with_length(type) >= id.clock end)
     |> Enum.find(fn type ->
       type
       |> Type.to_list(as_items: true)
@@ -233,9 +238,9 @@ defmodule Y.Doc do
     %{doc | share: share}
   end
 
-  def apply_update(update, transaction) when is_bitstring(update) do
+  def apply_update(transaction, update) when is_bitstring(update) do
     update
-    |> Decoder.decode(transaction)
+    |> Decoder.apply(transaction)
   end
 
   def put_pending_structs(
@@ -273,6 +278,23 @@ defmodule Y.Doc do
     array = Array.new(doc, array_name)
 
     {:reply, {:ok, array}, %Doc{doc | share: Map.put_new(share, array_name, array)}}
+  end
+
+  def handle_call({:get_map, name}, _, %{share: share} = doc) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        map = Y.Type.Map.from_unknown(u)
+        {:reply, {:ok, map}, %{doc | share: Map.replace(share, name, map)}}
+
+      _ ->
+        {:reply, {:error, "Type with the name #{name} has already been added"}, doc}
+    end
+  end
+
+  def handle_call({:get_map, map_name}, _, %{share: share} = doc) do
+    map = Y.Type.Map.new(doc, map_name)
+
+    {:reply, {:ok, map}, %Doc{doc | share: Map.put_new(share, map_name, map)}}
   end
 
   def handle_call(

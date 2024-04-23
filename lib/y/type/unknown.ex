@@ -17,29 +17,40 @@ defmodule Y.Type.Unknown do
   end
 
   defimpl Type do
-    def highest_clock(%Unknown{items: items}, client) do
-      items
-      |> Enum.filter(fn %Item{id: %ID{client: c}} -> c == client end)
-      |> Enum.sort_by(fn %Item{id: %ID{clock: clock}} -> clock end, :desc)
-      |> hd
-      |> case do
-        %Item{} = item -> item.id.clock
-        _ -> 0
+    def highest_clock(%Unknown{items: items}, client_id) do
+      case client_id do
+        nil -> items
+        client_id -> Enum.reject(items, fn %Item{id: %ID{client: cl}} -> cl != client_id end)
       end
+      |> Enum.reduce(0, fn %Item{id: %ID{clock: clock}}, acc ->
+        max(clock, acc)
+      end)
     end
 
-    def highest_clock_with_length(%Unknown{items: items}, client) do
-      items
-      |> Enum.filter(fn %Item{id: %ID{client: c}} -> c == client end)
-      |> Enum.sort_by(
-        fn %Item{id: %ID{clock: clock}} = item -> clock + Item.content_length(item) end,
-        :desc
-      )
-      |> hd
-      |> case do
-        %Item{} = item -> item.id.clock + Item.content_length(item)
-        _ -> 0
+    def highest_clock_with_length(%Unknown{items: items}, client_id) do
+      case client_id do
+        nil -> items
+        client_id -> Enum.reject(items, fn %Item{id: %ID{client: cl}} -> cl != client_id end)
       end
+      |> Enum.reduce(0, fn %Item{id: %ID{clock: clock}, length: length}, acc ->
+        max(clock + length, acc)
+      end)
+    end
+
+    def highest_clock_by_client_id(%Unknown{items: items}) do
+      Enum.reduce(items, %{}, fn item, acc ->
+        Map.update(acc, item.id.client, item.id.clock, fn existing ->
+          max(existing, item.id.clock)
+        end)
+      end)
+    end
+
+    def highest_clock_with_length_by_client_id(%Unknown{items: items}) do
+      Enum.reduce(items, %{}, fn item, acc ->
+        Map.update(acc, item.id.client, item.id.clock + Item.content_length(item), fn existing ->
+          max(existing, item.id.clock + Item.content_length(item))
+        end)
+      end)
     end
 
     def pack(%Unknown{items: items} = type) do
@@ -61,10 +72,13 @@ defmodule Y.Type.Unknown do
       %{type | items: new_items}
     end
 
-    def to_list(%Unknown{items: items}, as_items: false),
-      do: items |> Enum.flat_map(& &1.content)
+    def to_list(%Unknown{items: items}, opts \\ []) do
+      as_items = Keyword.get(opts, :as_items, false)
+      with_deleted = Keyword.get(opts, :with_deleted, false)
 
-    def to_list(%Unknown{items: items}, as_items: true), do: items
+      items = if with_deleted, do: items, else: Enum.reject(items, & &1.deleted?)
+      if as_items, do: items, else: items |> Enum.flat_map(& &1.content)
+    end
 
     def find(%Unknown{items: items}, %ID{} = id, default \\ nil),
       do: items |> Enum.find(default, &(&1.id == id))
@@ -162,10 +176,10 @@ defmodule Y.Type.Unknown do
       end
     end
 
-    def first(%Unknown{items: []}), do: nil
-    def first(%Unknown{items: [h | _]}), do: h
+    def first(%Unknown{items: []}, _), do: nil
+    def first(%Unknown{items: [h | _]}, _), do: h
 
-    def last(%Unknown{items: []}), do: nil
-    def last(%Unknown{items: items}), do: List.last(items)
+    def last(%Unknown{items: []}, _), do: nil
+    def last(%Unknown{items: items}, _), do: List.last(items)
   end
 end

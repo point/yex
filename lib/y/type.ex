@@ -1,6 +1,8 @@
 defprotocol Y.Type do
-  def highest_clock(type, client)
-  def highest_clock_with_length(type, client)
+  def highest_clock(type, client \\ nil)
+  def highest_clock_with_length(type, client \\ nil)
+  def highest_clock_by_client_id(type)
+  def highest_clock_with_length_by_client_id(type)
   def pack(type)
   def to_list(type, opts \\ [])
   def find(type, id, default \\ nil)
@@ -10,7 +12,7 @@ defprotocol Y.Type do
   def add_before(type, before_item, item)
   def next(type, item)
   def prev(type, item)
-  def first(type)
-  def last(type)
+  def first(type, reference_item)
+  def last(type, reference_item)
   def delete(type, transaction, id)
 end

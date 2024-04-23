@@ -55,7 +55,7 @@ defmodule Y.Type.Array do
   def from_unknown(%Unknown{} = u) do
     tree =
       u
-      |> Type.to_list(as_items: true)
+      |> Type.to_list(as_items: true, with_deleted: true)
       |> Enum.reduce(ArrayTree.new(), fn item, tree ->
         ArrayTree.conj!(tree, item)
       end)
@@ -140,6 +140,12 @@ defmodule Y.Type.Array do
 
     def highest_clock_with_length(%Array{tree: tree}, client),
       do: ArrayTree.highest_clock_with_length(tree, client)
+
+    def highest_clock_by_client_id(%Array{tree: tree}),
+      do: ArrayTree.highest_clock_by_client_id(tree)
+
+    def highest_clock_with_length_by_client_id(%Array{tree: tree}),
+      do: ArrayTree.highest_clock_with_length_by_client_id(tree)
 
     def pack(%Array{tree: tree} = array) do
       new_tree =
@@ -236,11 +242,11 @@ defmodule Y.Type.Array do
       ArrayTree.prev(tree, item)
     end
 
-    def first(%Array{tree: tree}) do
+    def first(%Array{tree: tree}, _) do
       ArrayTree.first(tree)
     end
 
-    def last(%Array{tree: tree}) do
+    def last(%Array{tree: tree}, _) do
       ArrayTree.last(tree)
     end
 

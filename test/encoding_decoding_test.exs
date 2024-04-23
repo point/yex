@@ -19,7 +19,7 @@ defmodule Y.EncodingDecodingTest do
     {:ok, doc} = Doc.new(name: :decode_message_from_js)
     {:ok, doc_instance} = Doc.get_instance(doc)
     %Transaction{} = transaction = Transaction.new(doc_instance, nil, true)
-    %Transaction{} = transaction = Decoder.decode(js_msg, transaction)
+    %Transaction{} = transaction = Decoder.apply(js_msg, transaction)
 
     assert {:ok,
             %Y.Type.Unknown{
@@ -58,8 +58,7 @@ defmodule Y.EncodingDecodingTest do
 
     assert {:ok, _} =
              Doc.transact(doc, fn transaction ->
-               transaction = Decoder.decode(msg, transaction)
-               {:ok, transaction}
+               {:ok, Doc.apply_update(transaction, msg)}
              end)
 
     {:ok, array} = Doc.get(doc, "array")
@@ -94,7 +93,7 @@ defmodule Y.EncodingDecodingTest do
                end
              end)
              |> Doc.transact!(fn transaction ->
-               {:ok, Decoder.decode(js_msg, transaction)}
+               {:ok, Doc.apply_update(transaction, js_msg)}
              end)
              |> Doc.get_array("array")
 
@@ -115,7 +114,7 @@ defmodule Y.EncodingDecodingTest do
                end
              end)
              |> Doc.transact!(fn transaction ->
-               {:ok, Decoder.decode(js_msg, transaction)}
+               {:ok, Doc.apply_update(transaction, js_msg)}
              end)
              |> Doc.get("array")
 
@@ -241,7 +240,7 @@ defmodule Y.EncodingDecodingTest do
              |> then(fn msg ->
                doc2
                |> Doc.transact!(fn transaction ->
-                 {:ok, Decoder.decode(msg, transaction)}
+                 {:ok, Doc.apply_update(transaction, msg)}
                end)
                |> Doc.get_array("array")
                |> elem(1)
@@ -302,7 +301,7 @@ defmodule Y.EncodingDecodingTest do
              |> then(fn msg ->
                doc2
                |> Doc.transact!(fn transaction ->
-                 {:ok, Decoder.decode(msg, transaction)}
+                 {:ok, Doc.apply_update(transaction, msg)}
                end)
                |> Doc.get_array("array")
                |> elem(1)
@@ -328,8 +327,7 @@ defmodule Y.EncodingDecodingTest do
 
     doc2
     |> Doc.transact!(fn transaction ->
-      transaction = Decoder.decode(msg, transaction)
-      {:ok, transaction}
+      {:ok, Doc.apply_update(transaction, msg)}
     end)
 
     assert {:ok, _array2} = Doc.get(doc2, "array")
@@ -348,8 +346,7 @@ defmodule Y.EncodingDecodingTest do
 
     doc2
     |> Doc.transact!(fn transaction ->
-      transaction = Decoder.decode(msg2, transaction)
-      {:ok, transaction}
+      {:ok, Doc.apply_update(transaction, msg2)}
     end)
 
     assert {:ok, array2} = Doc.get(doc2, "array")
@@ -376,8 +373,7 @@ defmodule Y.EncodingDecodingTest do
 
     doc2
     |> Doc.transact!(fn transaction ->
-      transaction = Decoder.decode(msg, transaction)
-      {:ok, transaction}
+      {:ok, Doc.apply_update(transaction, msg)}
     end)
 
     assert {:ok, array2} = Doc.get(doc2, "array")
@@ -397,8 +393,7 @@ defmodule Y.EncodingDecodingTest do
 
     doc2
     |> Doc.transact!(fn transaction ->
-      transaction = Decoder.decode(msg2, transaction)
-      {:ok, transaction}
+      {:ok, Doc.apply_update(transaction, msg2)}
     end)
 
     assert {:ok, array2} = Doc.get(doc2, "array")

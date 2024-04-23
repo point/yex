@@ -17,9 +17,12 @@ defmodule Y.Type.Array.ArrayTree do
     %ArrayTree{ft: FingerTree.finger_tree(meter_object())}
   end
 
-  def highest_clock_with_length(%ArrayTree{ft: tree}, :all) do
+  def highest_clock_with_length(%ArrayTree{ft: tree}, nil) do
     %Meter{highest_clocks_with_length: cl} = FingerTree.measure(tree)
+
     cl
+    |> Map.values()
+    |> Enum.max(fn -> 0 end)
   end
 
   def highest_clock_with_length(%ArrayTree{ft: tree}, client_id) do
@@ -31,9 +34,12 @@ defmodule Y.Type.Array.ArrayTree do
     end
   end
 
-  def highest_clock(%ArrayTree{ft: tree}, :all) do
+  def highest_clock(%ArrayTree{ft: tree}, nil) do
     %Meter{highest_clocks: c} = FingerTree.measure(tree)
+
     c
+    |> Map.values()
+    |> Enum.max(fn -> 0 end)
   end
 
   def highest_clock(%ArrayTree{ft: tree}, client_id) do
@@ -43,6 +49,16 @@ defmodule Y.Type.Array.ArrayTree do
       {:ok, clock} -> clock
       _ -> 0
     end
+  end
+
+  def highest_clock_with_length_by_client_id(%ArrayTree{ft: tree}) do
+    %Meter{highest_clocks_with_length: cl} = FingerTree.measure(tree)
+    cl
+  end
+
+  def highest_clock_by_client_id(%ArrayTree{ft: tree}) do
+    %Meter{highest_clocks: c} = FingerTree.measure(tree)
+    c
   end
 
   def put(%ArrayTree{ft: %EmptyTree{} = tree} = array_tree, _index, %Item{} = item) do

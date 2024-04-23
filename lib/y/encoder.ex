@@ -14,7 +14,7 @@ defmodule Y.Encoder do
          doc <- Doc.pack!(doc),
          sm <-
            doc
-           |> Doc.highest_clock_with_length!()
+           |> Doc.highest_clock_with_length_by_client_id!()
            |> Enum.map(fn {k, _v} -> {k, 0} end)
            |> Enum.into(%{}) do
       Buffer.new()
