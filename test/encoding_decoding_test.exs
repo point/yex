@@ -408,4 +408,22 @@ defmodule Y.EncodingDecodingTest do
 
     assert Enum.count(array2) == 9
   end
+
+  test "decode with maps" do
+    msg =
+      <<0, 0, 6, 195, 138, 230, 232, 9, 3, 4, 1, 0, 6, 0, 0, 7, 39, 0, 40, 1, 39, 0, 40, 46, 37,
+        109, 97, 112, 48, 109, 49, 110, 117, 109, 98, 101, 114, 115, 116, 114, 105, 110, 103, 109,
+        97, 112, 48, 109, 50, 111, 98, 106, 101, 99, 116, 98, 111, 111, 108, 101, 97, 110, 4, 2,
+        70, 0, 4, 2, 6, 7, 7, 1, 0, 0, 1, 1, 0, 0, 2, 65, 0, 2, 65, 2, 1, 6, 0, 125, 1, 119, 5,
+        104, 101, 108, 108, 111, 118, 1, 1, 120, 125, 1, 120, 0>>
+
+    {:ok, doc} = Doc.new(name: :decode_with_maps)
+
+    assert {:ok, _} =
+             Doc.transact(doc, fn transaction ->
+               {:ok, Doc.apply_update(transaction, msg)}
+             end)
+
+    {:ok, map0} = Doc.get(doc, "map0")
+  end
 end

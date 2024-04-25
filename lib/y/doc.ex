@@ -78,11 +78,29 @@ defmodule Y.Doc do
     end
   end
 
-  def get_array(doc_name, array_name \\ "") do
+  def get_array(doc_name_or_transaction, array_name \\ UUID.uuid4())
+
+  def get_array(%Transaction{doc: doc} = transaction, array_name) do
+    case do_get_array(doc, array_name) do
+      {:ok, array, doc} -> {:ok, array, %{transaction | doc: doc}}
+      {:error, _} = err -> err
+    end
+  end
+
+  def get_array(doc_name, array_name) do
     GenServer.call(doc_name, {:get_array, array_name})
   end
 
-  def get_map(doc_name, map_name \\ "") do
+  def get_map(transaction, map_name \\ UUID.uuid4())
+
+  def get_map(%Transaction{doc: doc} = transaction, map_name) do
+    case do_get_map(doc, map_name) do
+      {:ok, map, doc} -> {:ok, map, %{transaction | doc: doc}}
+      {:error, _} = err -> err
+    end
+  end
+
+  def get_map(doc_name, map_name) do
     GenServer.call(doc_name, {:get_map, map_name})
   end
 
@@ -263,38 +281,56 @@ defmodule Y.Doc do
     GenServer.call(pid, :get_instance)
   end
 
-  def handle_call({:get_array, name}, _, %{share: share} = doc) when is_map_key(share, name) do
+  defp do_get_array(%Doc{share: share} = doc, name) when is_map_key(share, name) do
     case share[name] do
       %Unknown{} = u ->
         array = Array.from_unknown(u)
-        {:reply, {:ok, array}, %{doc | share: Map.replace(share, name, array)}}
+        doc = %{doc | share: Map.replace(share, name, array)}
+        {:ok, array, doc}
 
       _ ->
-        {:reply, {:error, "Type with the name #{name} has already been added"}, doc}
+        {:error, "Type with the name #{name} has already been added"}
     end
   end
 
-  def handle_call({:get_array, array_name}, _, %{share: share} = doc) do
-    array = Array.new(doc, array_name)
+  defp do_get_array(%Doc{} = doc, name) do
+    array =
+      case name do
+        nil -> Array.new(doc)
+        _ -> Array.new(doc, name)
+      end
 
-    {:reply, {:ok, array}, %Doc{doc | share: Map.put_new(share, array_name, array)}}
+    {:ok, array, %Doc{doc | share: Map.put_new(doc.share, name, array)}}
   end
 
-  def handle_call({:get_map, name}, _, %{share: share} = doc) when is_map_key(share, name) do
+  def do_get_map(%Doc{share: share} = doc, name) when is_map_key(share, name) do
     case share[name] do
       %Unknown{} = u ->
         map = Y.Type.Map.from_unknown(u)
-        {:reply, {:ok, map}, %{doc | share: Map.replace(share, name, map)}}
+        {:ok, map, %{doc | share: Map.replace(share, name, map)}}
 
       _ ->
-        {:reply, {:error, "Type with the name #{name} has already been added"}, doc}
+        {:error, "Type with the name #{name} has already been added"}
     end
   end
 
-  def handle_call({:get_map, map_name}, _, %{share: share} = doc) do
-    map = Y.Type.Map.new(doc, map_name)
+  def do_get_map(%Doc{} = doc, name) do
+    map = Y.Type.Map.new(doc, name)
+    {:ok, map, %Doc{doc | share: Map.put_new(doc.share, name, map)}}
+  end
 
-    {:reply, {:ok, map}, %Doc{doc | share: Map.put_new(share, map_name, map)}}
+  def handle_call({:get_array, name}, _, doc) do
+    case do_get_array(doc, name) do
+      {:ok, array, doc} -> {:reply, {:ok, array}, doc}
+      {:error, _} = err -> {:reply, err, doc}
+    end
+  end
+
+  def handle_call({:get_map, name}, _, doc) do
+    case do_get_map(doc, name) do
+      {:ok, map, doc} -> {:reply, {:ok, map}, doc}
+      {:error, _} = err -> {:reply, err, doc}
+    end
   end
 
   def handle_call(

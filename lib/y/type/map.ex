@@ -10,7 +10,7 @@ defmodule Y.Type.Map do
             doc_name: nil,
             name: nil
 
-  def new(%Doc{name: doc_name}, name) do
+  def new(%Doc{name: doc_name}, name \\ UUID.uuid4()) do
     %Y.Type.Map{doc_name: doc_name, name: name}
   end
 

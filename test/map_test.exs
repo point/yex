@@ -51,5 +51,24 @@ defmodule Y.MapTest do
     {:ok, array} = Doc.get(doc, "array")
     assert [_, map_from_list] = Array.to_list(array)
     assert [{"other key", 123}, {"key2", %{}}, {"key", [1, 2, 3]}] = TMap.to_list(map_from_list)
+
+    assert TMap.has_key?(map_from_list, "other key")
+    refute TMap.has_key?(map_from_list, "zzz")
+
+    assert ["key", "key2", "other key"] = TMap.keys(map_from_list)
+  end
+
+  test "map in map" do
+    {:ok, doc} = Doc.new(name: :map_in_map)
+    {:ok, map0} = Doc.get_map(doc, "map0")
+    {:ok, map1} = Doc.get_map(doc, "map1")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, map1, transaction} = Y.Type.Map.put(map1, transaction, "number key", 1)
+      {:ok, _, transaction} = Y.Type.Map.put(map0, transaction, "m1", map1)
+      {:ok, transaction}
+    end)
+
+    {:ok, map0} = Doc.get(doc, "map0")
   end
 end

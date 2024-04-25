@@ -14,7 +14,7 @@ defmodule Y.Type.Array do
             doc_name: nil,
             name: nil
 
-  def new(%Doc{name: doc_name}, name) do
+  def new(%Doc{name: doc_name}, name \\ UUID.uuid4()) do
     %Array{doc_name: doc_name, name: name, tree: ArrayTree.new()}
   end
 
