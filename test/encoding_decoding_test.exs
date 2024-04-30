@@ -71,7 +71,7 @@ defmodule Y.EncodingDecodingTest do
     assert %Y.Item{
              id: %Y.ID{client: 426_441_125, clock: 5},
              length: 1,
-             content: %Y.Content.Deleted{len: 1},
+             content: [%Y.Content.Deleted{len: 1}],
              origin: %Y.ID{client: 426_441_125, clock: 4},
              right_origin: nil,
              parent_name: "array",

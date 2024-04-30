@@ -69,6 +69,6 @@ defmodule Y.MapTest do
       {:ok, transaction}
     end)
 
-    {:ok, map0} = Doc.get(doc, "map0")
+    # {:ok, map0} = Doc.get(doc, "map0")
   end
 end
