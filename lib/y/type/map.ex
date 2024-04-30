@@ -91,7 +91,7 @@ defmodule Y.Type.Map do
         item, map -> Map.update(map, item.parent_sub, [item], fn items -> [item | items] end)
       end)
       |> Enum.map(fn {k, items} ->
-        {[live | _], deleted} = Enum.split_with(items, & &1.deleted?)
+        {deleted, [live | _]} = Enum.split_with(items, & &1.deleted?)
         {k, [live | deleted]}
       end)
       |> Enum.into(%{})
@@ -252,7 +252,7 @@ defmodule Y.Type.Map do
           if Map.fetch!(new_map, parent_sub) == Map.fetch!(map, parent_sub) do
             {:error, "Item not found"}
           else
-            %{map_type | map: new_map}
+            {:ok, %{map_type | map: new_map}}
           end
       end
     end
@@ -294,7 +294,7 @@ defmodule Y.Type.Map do
       if Map.fetch!(new_map, parent_sub) == Map.fetch!(map, parent_sub) do
         {:error, "Item not found"}
       else
-        %{map_type | map: new_map}
+        {:ok, %{map_type | map: new_map}}
       end
     end
 
@@ -318,8 +318,20 @@ defmodule Y.Type.Map do
       if Map.fetch!(new_map, parent_sub) == Map.fetch!(map, parent_sub) do
         {:error, "Item not found"}
       else
-        %{map_type | map: new_map}
+        {:ok, %{map_type | map: new_map}}
       end
+    end
+
+    def add_before(
+          %Y.Type.Map{map: map} = map_type,
+          nil,
+          %Item{parent_sub: parent_sub} = item
+        )
+        when not is_nil(parent_sub) do
+      new_map =
+        Map.update(map, parent_sub, [item], fn items -> [item | items] end)
+
+      {:ok, %{map_type | map: new_map}}
     end
 
     def next(%Item{parent_sub: nil}), do: nil

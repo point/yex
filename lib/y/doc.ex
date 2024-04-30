@@ -376,6 +376,8 @@ defmodule Y.Doc do
     )
   end
 
+  # defp replace_recursively(%{name: name}, %{name: name} = with_type), do: with_type
+
   defp replace_recursively(type, %{name: name} = with_type) do
     type
     |> Type.to_list(with_deleted: true, as_items: true)
@@ -387,7 +389,7 @@ defmodule Y.Doc do
         end
 
       %Item{content: [%_{} = content]} = item, type ->
-        with impl when is_atom(impl) <- Type.impl_for(item),
+        with impl when not is_nil(impl) <- Type.impl_for(content),
              {:ok, new_type} <-
                Type.unsafe_replace(type, item, [
                  %Item{item | content: [replace_recursively(content, with_type)]}

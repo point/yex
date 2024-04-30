@@ -3,6 +3,7 @@ defmodule Y.EncodingDecodingTest do
 
   alias Y.Doc
   alias Y.Type.Array
+  alias Y.Type.Map, as: TMap
   alias Y.Decoder
   alias Y.Encoder
   alias Y.Transaction
@@ -424,6 +425,85 @@ defmodule Y.EncodingDecodingTest do
                {:ok, Doc.apply_update(transaction, msg)}
              end)
 
-    {:ok, map0} = Doc.get(doc, "map0")
+    {:ok, map0} = Doc.get_map(doc, "map0")
+
+    assert [
+             %Y.Item{
+               id: %Y.ID{client: 1_317_847_683, clock: 3},
+               length: 1,
+               content: [
+                 %Y.Type.Map{
+                   doc_name: :decode_with_maps,
+                   name: _
+                 }
+               ],
+               parent_name: "map0",
+               parent_sub: "m2",
+               deleted?: false
+             },
+             %Y.Item{
+               id: %Y.ID{client: 1_317_847_683, clock: 0},
+               length: 1,
+               content: [
+                 %Y.Type.Map{
+                   doc_name: :decode_with_maps,
+                   name: _
+                 }
+               ],
+               parent_name: "map0",
+               parent_sub: "m1",
+               deleted?: false
+             }
+           ] = TMap.to_list(map0, as_items: true)
+
+    assert ["m1", "m2"] = TMap.keys(map0)
+
+    assert %TMap{} = m1 = TMap.get(map0, "m1")
+    assert ["number", "string"] = TMap.keys(m1)
+    assert 1 == TMap.get(m1, "number")
+    assert "hello" == TMap.get(m1, "string")
+
+    assert [
+             %Y.Item{
+               id: %Y.ID{client: 1_317_847_683, clock: 2},
+               length: 1,
+               content: ["hello"],
+               parent_name: _,
+               parent_sub: "string",
+               deleted?: false
+             },
+             %Y.Item{
+               id: %Y.ID{client: 1_317_847_683, clock: 1},
+               length: 1,
+               content: [1],
+               parent_name: _,
+               parent_sub: "number",
+               deleted?: false
+             }
+           ] = TMap.to_list(m1, as_items: true)
+
+    assert %TMap{} = m2 = TMap.get(map0, "m2")
+    assert ["boolean", "object"] = TMap.keys(m2)
+    assert true === TMap.get(m2, "boolean")
+    assert %{"x" => 1} = TMap.get(m2, "object")
+
+    assert [
+             %Y.Item{
+               id: %Y.ID{client: 1_317_847_683, clock: 4},
+               length: 1,
+               content: [%{"x" => 1}],
+               parent_name: _,
+               parent_sub: "object",
+               deleted?: false
+             },
+             %Y.Item{
+               id: %Y.ID{client: 1_317_847_683, clock: 5},
+               length: 1,
+               content: [true],
+               parent_name: _,
+               parent_sub: "boolean",
+               deleted?: false
+             }
+           ] = TMap.to_list(m2, as_items: true)
   end
 end

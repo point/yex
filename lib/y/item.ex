@@ -147,9 +147,10 @@ defmodule Y.Item do
 
   def integrate(%Item{parent_name: %ID{} = item_of_parent_id} = item, transaction, offset) do
     with true <- valid?(item, transaction),
-         %Item{parent_name: parent_name} <- Doc.find_item(transaction, item_of_parent_id) do
+         %Item{content: [%_{name: parent_name}]} <- Doc.find_item(transaction, item_of_parent_id) do
       integrate(%{item | parent_name: parent_name}, transaction, offset)
     else
+      %Y.GC{} -> integrate(%{item | parent_name: nil}, transaction, offset)
       false -> {:invalid, item}
       _ -> {:error, "Cannot integrate item"}
     end

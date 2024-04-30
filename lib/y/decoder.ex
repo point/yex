@@ -173,7 +173,7 @@ defmodule Y.Decoder do
         }
 
       items_to_retry_with_retry_count_less_2 ->
-        do_integrate(items_to_retry_with_retry_count_less_2, items_to_retry, transaction)
+        do_integrate(items_to_retry_with_retry_count_less_2, items_to_retry, internal_state)
     end
   end
 
@@ -239,7 +239,7 @@ defmodule Y.Decoder do
   # read deleted content
   defp read_content(1, state, transaction) do
     {len, state} = State.read_len(state)
-    {Y.Content.Deleted.new(len), state, transaction}
+    {[Y.Content.Deleted.new(len)], state, transaction}
   end
 
   # read json content
@@ -261,7 +261,7 @@ defmodule Y.Decoder do
       end)
 
     cs = Enum.reverse(cs)
-    {Y.Content.JSON.new(cs), state, transaction}
+    {[Y.Content.JSON.new(cs)], state, transaction}
   end
 
   # read binary content
@@ -273,7 +273,7 @@ defmodule Y.Decoder do
   # read binary string
   defp read_content(4, state, transaction) do
     {s, state} = State.read_and_advance(state, :rest, &read_raw_string/1)
-    {s, state, transaction}
+    {[s], state, transaction}
   end
 
   # read content embed
@@ -297,7 +297,7 @@ defmodule Y.Decoder do
         _ -> raise("Reading this type of content is not implemented")
       end
 
-    {type, state, transaction}
+    {[type], state, transaction}
   end
 
   # read content any
