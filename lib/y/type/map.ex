@@ -135,7 +135,8 @@ defmodule Y.Type.Map do
     def highest_clock_by_client_id(%Y.Type.Map{map: map}) do
       map
       |> Map.values()
-      |> Enum.reduce(%{}, fn {_k, item}, acc ->
+      |> List.flatten()
+      |> Enum.reduce(%{}, fn item, acc ->
         Map.update(acc, item.id.client, item.id.clock, fn existing ->
           max(existing, item.id.clock)
         end)
@@ -145,7 +146,8 @@ defmodule Y.Type.Map do
     def highest_clock_with_length_by_client_id(%Y.Type.Map{map: map}) do
       map
       |> Map.values()
-      |> Enum.reduce(%{}, fn {_k, item}, acc ->
+      |> List.flatten()
+      |> Enum.reduce(%{}, fn item, acc ->
         Map.update(acc, item.id.client, item.id.clock + Item.content_length(item), fn existing ->
           max(existing, item.id.clock + Item.content_length(item))
         end)
@@ -381,5 +383,7 @@ defmodule Y.Type.Map do
     end
 
     defdelegate delete(map_type, transaction, id), to: Y.Type.Map, as: :delete
+
+    def type_ref(_), do: 1
   end
 end

@@ -251,6 +251,8 @@ defmodule Y.Type.Array do
     end
 
     defdelegate delete(array, transaction, id), to: Y.Type.Array, as: :delete_by_id
+
+    def type_ref(_), do: 0
   end
 
   defimpl Enumerable do

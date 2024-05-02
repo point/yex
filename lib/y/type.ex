@@ -15,4 +15,14 @@ defprotocol Y.Type do
   def first(type, reference_item)
   def last(type, reference_item)
   def delete(type, transaction, id)
+  def type_ref(type)
 end
+
+# export const YArrayRefID = 0
+# export const YMapRefID = 1
+# export const YTextRefID = 2
+# export const YXmlElementRefID = 3
+# export const YXmlFragmentRefID = 4
+# export const YXmlHookRefID = 5
+# export const YXmlTextRefID = 6
+#

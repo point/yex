@@ -6,6 +6,7 @@ defmodule Y.Item do
   alias Y.Type
   alias Y.Skip
   alias Y.Content.Binary
+  alias Y.Content.Deleted
 
   require Logger
 
@@ -137,9 +138,24 @@ defmodule Y.Item do
     end
   end
 
-  def content_ref(%Item{content: content}) do
+  def content_ref(%Item{content: [content]}) do
+    # () => { error.unexpectedCase() }, // GC is not ItemContent
+    # readContentDeleted, // 1
+    # readContentJSON, // 2
+    # readContentBinary, // 3
+    # readContentString, // 4
+    # readContentEmbed, // 5
+    # readContentFormat, // 6
+    # readContentType, // 7
+    # readContentAny, // 8
+    # readContentDoc, // 9
+    # () => { error.unexpectedCase() } // 10 - Skip is not ItemContent
     cond do
-      match?([%Binary{}], content) -> 3
+      match?(%Y.GC{}, content) -> raise "GC is not ItemContent"
+      match?(%Y.Skip{}, content) -> raise "Skip is not ItemContent"
+      match?(%Deleted{}, content) -> 1
+      match?(%Binary{}, content) -> 3
+      is_struct(content) && Type.impl_for(content) != nil -> 7
       is_struct(content) -> 9
       :otherwise -> 8
     end

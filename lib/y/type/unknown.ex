@@ -181,5 +181,7 @@ defmodule Y.Type.Unknown do
 
     def last(%Unknown{items: []}, _), do: nil
     def last(%Unknown{items: items}, _), do: List.last(items)
+
+    def type_ref(_), do: -1
   end
 end

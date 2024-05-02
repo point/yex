@@ -2,6 +2,7 @@ defmodule Y.Encoder do
   alias Y.Doc
   alias Y.ID
   alias Y.Item
+  alias Y.Type
   alias Y.Encoder.Buffer
   alias Y.Content.Binary
 
@@ -58,15 +59,15 @@ defmodule Y.Encoder do
             items
             |> Enum.with_index()
             |> Enum.reduce(buf, fn
-              {item, 0}, buf -> write_item(buf, item, clock - f_clock)
-              {item, _}, buf -> write_item(buf, item)
+              {item, 0}, buf -> write_item(buf, item, doc, clock - f_clock)
+              {item, _}, buf -> write_item(buf, item, doc)
             end)
           end)
       end
     end)
   end
 
-  defp write_item(buf, %Item{id: id} = item, offset \\ 0) do
+  defp write_item(buf, %Item{id: id} = item, %Doc{} = doc, offset \\ 0) do
     origin =
       if offset > 0 && item.origin,
         do: ID.new(id.client, id.clock + offset - 1),
@@ -85,21 +86,38 @@ defmodule Y.Encoder do
     |> then(fn buf ->
       if item.right_origin, do: buf |> write(:right_id, item.right_origin), else: buf
     end)
-    |> write_parent_info(item)
+    |> write_parent_info(item, doc)
     |> write_content(item, offset)
   end
 
-  defp write_parent_info(buf, %Item{origin: nil, right_origin: nil} = item) do
-    # TODO case when parent is map
-    # TODO other cases
-    if item.parent_name do
-      buf |> write(:parent_info, 1) |> write(:string, item.parent_name)
-    else
-      buf
+  defp write_parent_info(buf, %Item{origin: nil, right_origin: nil} = item, %Doc{} = doc) do
+    case Doc.get!(doc, item.parent_name) do
+      {:ok, parent} ->
+        if parent_item = Doc.find_parent_item!(doc, item) do
+          buf |> write(:parent_info, 0) |> write(:left_id, parent_item.id)
+        else
+          case parent do
+            %ID{} ->
+              buf |> write(:parent_info, 0) |> write(:left_id, parent)
+
+            _ ->
+              buf |> write(:parent_info, 1) |> write(:string, parent.name)
+          end
+        end
+        |> then(fn buf ->
+          if item.parent_sub do
+            buf |> write(:string, item.parent_sub)
+          else
+            buf
+          end
+        end)
+
+      _ ->
+        buf
     end
   end
 
-  defp write_parent_info(buf, _), do: buf
+  defp write_parent_info(buf, _, _), do: buf
 
   defp write_content(buf, %Item{content: content}, offset) do
     len = length(content)
@@ -143,8 +161,11 @@ defmodule Y.Encoder do
         content = c.content
         buf |> write(:rest, <<byte_size(content), content::binary>>)
 
-      is_struct(c) ->
-        c = Map.from_struct(c)
+      is_struct(c) && Type.impl_for(c) != nil ->
+        buf |> write(:type_ref, Type.type_ref(c))
+
+      is_struct(c) || is_map(c) ->
+        c = if is_struct(c), do: Map.from_struct(c), else: c
         buf = buf |> write(:rest, <<118>>) |> write(:rest, write_uint(map_size(c)))
 
         Enum.reduce(c, buf, fn

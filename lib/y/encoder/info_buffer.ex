@@ -1,6 +1,6 @@
 defmodule Y.Encoder.InfoBuffer do
   alias __MODULE__
-  defstruct buffer: <<>>, s: 0, count: 0
+  defstruct buffer: <<>>, s: nil, count: 0
   import Y.Encoder.Operations
 
   def new, do: %InfoBuffer{}

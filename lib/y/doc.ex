@@ -204,6 +204,20 @@ defmodule Y.Doc do
     |> Enum.find_value(fn t -> Type.find(t, id, default) end)
   end
 
+  def find_parent_item!(%Doc{} = doc, %Item{} = child_item) do
+    doc.share
+    |> Map.values()
+    |> Enum.find_value(fn type ->
+      do_find_parent(type, child_item)
+    end)
+  end
+
+  def find_parent_item!(doc_name, %Item{} = child_item) do
+    with {:ok, doc} <- get_instance(doc_name) do
+      find_parent_item!(doc, child_item)
+    end
+  end
+
   def items_of_client!(%Doc{} = doc, client) do
     doc.share
     |> Map.values()
@@ -211,8 +225,8 @@ defmodule Y.Doc do
       type
       |> Type.to_list(as_items: true, with_deleted: true)
       |> Enum.filter(fn %_{id: %ID{client: c}} -> c == client end)
-      |> Enum.sort_by(fn %_{id: %ID{clock: clock}} -> clock end)
     end)
+    |> Enum.sort_by(fn %_{id: %ID{clock: clock}} -> clock end)
   end
 
   def type_with_id!(%Doc{} = doc, %ID{} = id) do
@@ -279,44 +293,6 @@ defmodule Y.Doc do
 
   def get_instance(pid) do
     GenServer.call(pid, :get_instance)
-  end
-
-  defp do_get_array(%Doc{share: share} = doc, name) when is_map_key(share, name) do
-    case share[name] do
-      %Unknown{} = u ->
-        array = Array.from_unknown(u)
-        doc = %{doc | share: Map.replace(share, name, array)}
-        {:ok, array, doc}
-
-      _ ->
-        {:error, "Type with the name #{name} has already been added"}
-    end
-  end
-
-  defp do_get_array(%Doc{} = doc, name) do
-    array =
-      case name do
-        nil -> Array.new(doc)
-        _ -> Array.new(doc, name)
-      end
-
-    {:ok, array, %Doc{doc | share: Map.put_new(doc.share, name, array)}}
-  end
-
-  def do_get_map(%Doc{share: share} = doc, name) when is_map_key(share, name) do
-    case share[name] do
-      %Unknown{} = u ->
-        map = Y.Type.Map.from_unknown(u)
-        {:ok, map, %{doc | share: Map.replace(share, name, map)}}
-
-      _ ->
-        {:error, "Type with the name #{name} has already been added"}
-    end
-  end
-
-  def do_get_map(%Doc{} = doc, name) do
-    map = Y.Type.Map.new(doc, name)
-    {:ok, map, %Doc{doc | share: Map.put_new(doc.share, name, map)}}
   end
 
   def handle_call({:get_array, name}, _, doc) do
@@ -402,5 +378,65 @@ defmodule Y.Doc do
       _item, type ->
         type
     end)
+  end
+
+  defp do_get_array(%Doc{share: share} = doc, name) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        array = Array.from_unknown(u)
+        doc = %{doc | share: Map.replace(share, name, array)}
+        {:ok, array, doc}
+
+      _ ->
+        {:error, "Type with the name #{name} has already been added"}
+    end
+  end
+
+  defp do_get_array(%Doc{} = doc, name) do
+    array =
+      case name do
+        nil -> Array.new(doc)
+        _ -> Array.new(doc, name)
+      end
+
+    {:ok, array, %Doc{doc | share: Map.put_new(doc.share, name, array)}}
+  end
+
+  defp do_get_map(%Doc{share: share} = doc, name) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        map = Y.Type.Map.from_unknown(u)
+        {:ok, map, %{doc | share: Map.replace(share, name, map)}}
+
+      _ ->
+        {:error, "Type with the name #{name} has already been added"}
+    end
+  end
+
+  defp do_get_map(%Doc{} = doc, name) do
+    map = Y.Type.Map.new(doc, name)
+    {:ok, map, %Doc{doc | share: Map.put_new(doc.share, name, map)}}
+  end
+
+  defp do_find_parent(type, child_item) do
+    if Type.impl_for(type) do
+      type
+      |> Type.to_list(as_items: true, with_deleted: true)
+      |> Enum.find_value(fn %_{content: [content]} = found ->
+        case Type.impl_for(content) do
+          nil ->
+            nil
+
+          _ ->
+            content
+            |> Type.to_list(as_items: true, with_deleted: true)
+            |> Enum.find(&(&1 == child_item))
+            |> case do
+              nil -> do_find_parent(content, child_item)
+              _ -> found
+            end
+        end
+      end)
+    end
   end
 end

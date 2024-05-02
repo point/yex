@@ -16,6 +16,7 @@ defmodule Y.Encoder.Buffer do
             parent_info: InfoBuffer.new(),
             string: StringBuffer.new(),
             length: ClientOrLengthBuffer.new(),
+            type_ref: ClientOrLengthBuffer.new(),
             delete_set_cur_val: 0
 
   def new(), do: %Buffer{}
@@ -66,6 +67,10 @@ defmodule Y.Encoder.Buffer do
     |> write(:rest, write_uint(length - 1))
   end
 
+  def write(%Buffer{type_ref: tr} = b, :type_ref, ref) do
+    %{b | type_ref: ClientOrLengthBuffer.write(tr, ref)}
+  end
+
   def write(%Buffer{} = b, key, what) do
     existing = Map.fetch!(b, key)
     %{b | key => existing <> what}
@@ -75,7 +80,6 @@ defmodule Y.Encoder.Buffer do
 
   def dump(%Buffer{} = b) do
     key_clock = <<>>
-    type_ref = <<>>
 
     <<0>>
     |> Kernel.<>(write_bitstring(key_clock))
@@ -85,7 +89,7 @@ defmodule Y.Encoder.Buffer do
     |> Kernel.<>(Bufferable.dump(b.info) |> write_bitstring())
     |> Kernel.<>(Bufferable.dump(b.string) |> write_bitstring())
     |> Kernel.<>(Bufferable.dump(b.parent_info) |> write_bitstring())
-    |> Kernel.<>(write_bitstring(type_ref))
+    |> Kernel.<>(Bufferable.dump(b.type_ref) |> write_bitstring())
     |> Kernel.<>(Bufferable.dump(b.length) |> write_bitstring())
     |> Kernel.<>(b.rest)
   end
