@@ -422,20 +422,22 @@ defmodule Y.Doc do
     if Type.impl_for(type) do
       type
       |> Type.to_list(as_items: true, with_deleted: true)
-      |> Enum.find_value(fn %_{content: [content]} = found ->
-        case Type.impl_for(content) do
-          nil ->
-            nil
+      |> Enum.find_value(fn %_{content: content_list} = found ->
+        Enum.find_value(content_list, fn content ->
+          case Type.impl_for(content) do
+            nil ->
+              nil
 
-          _ ->
-            content
-            |> Type.to_list(as_items: true, with_deleted: true)
-            |> Enum.find(&(&1 == child_item))
-            |> case do
-              nil -> do_find_parent(content, child_item)
-              _ -> found
-            end
-        end
+            _ ->
+              content
+              |> Type.to_list(as_items: true, with_deleted: true)
+              |> Enum.find(&(&1 == child_item))
+              |> case do
+                nil -> do_find_parent(content, child_item)
+                _ -> found
+              end
+          end
+        end)
       end)
     end
   end

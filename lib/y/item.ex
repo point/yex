@@ -138,7 +138,7 @@ defmodule Y.Item do
     end
   end
 
-  def content_ref(%Item{content: [content]}) do
+  def content_ref(%Item{content: [content | _]}) do
     # () => { error.unexpectedCase() }, // GC is not ItemContent
     # readContentDeleted, // 1
     # readContentJSON, // 2

@@ -440,7 +440,7 @@ defmodule Y.EncodingDecodingTest do
                parent_name: "map0",
                parent_sub: "m2",
                deleted?: false
-             },
+             } = top,
              %Y.Item{
                id: %Y.ID{client: 1_317_847_683, clock: 0},
                length: 1,
@@ -503,7 +503,10 @@ defmodule Y.EncodingDecodingTest do
                parent_name: _,
                parent_sub: "boolean",
                deleted?: false
-             }
+             } = inner
            ] = TMap.to_list(m2, as_items: true)
+
+    assert nil == Doc.find_parent_item!(doc, top)
+    assert ^top = Doc.find_parent_item!(doc, inner)
   end
 end
