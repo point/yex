@@ -61,7 +61,7 @@ defmodule Y.Type.Map do
 
   def get_item(%Y.Type.Map{map: map}, key, default \\ nil) do
     case Map.fetch(map, key) do
-      {:ok, [%Item{deleted?: false} = item | _]} -> item
+      {:ok, [%Item{} = item | _]} -> item
       _ -> default
     end
   end
@@ -113,12 +113,12 @@ defmodule Y.Type.Map do
       {:ok, new_map_type, transaction}
     else
       %Item{deleted?: true} ->
-        Logger.warning("Item already deleted",
+        Logger.info("Item already deleted",
           map: map,
           key: key
         )
 
-        {:error, map, transaction}
+        {:ok, map, transaction}
 
       err ->
         Logger.warning("Fail to delete map item by key #{inspect(key)}. Error: #{inspect(err)}",

@@ -122,6 +122,12 @@ defmodule Y.MapTest do
     assert {:ok, map0} = Doc.get(doc, "map0")
     assert %TMap{} = map1 = TMap.get(map0, "m1")
     assert nil == TMap.get(map1, "number key")
-    assert nil == TMap.get_item(map1, "number key")
+    assert %Item{deleted?: true} = TMap.get_item(map1, "number key")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, map1} = Doc.get(transaction, "map1")
+      assert {:ok, _, transaction} = TMap.delete(map1, transaction, "number key")
+      {:ok, transaction}
+    end)
   end
 end
