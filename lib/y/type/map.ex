@@ -6,6 +6,8 @@ defmodule Y.Type.Map do
   alias Y.Item
   alias Y.ID
 
+  require Logger
+
   defstruct map: %{},
             doc_name: nil,
             name: nil
@@ -97,6 +99,35 @@ defmodule Y.Type.Map do
       |> Enum.into(%{})
 
     %Y.Type.Map{doc_name: u.doc_name, name: u.name, map: map}
+  end
+
+  def delete(%Y.Type.Map{map: map} = map_type, transaction, key) do
+    with %Item{deleted?: false} = item <- get_item(map_type, key),
+         deleted_item <- Item.delete(item),
+         new_map_type = %{
+           map_type
+           | map: Map.update!(map, key, fn [_ | rest] -> [deleted_item | rest] end)
+         },
+         {:ok, transaction} <-
+           Transaction.update(transaction, new_map_type) do
+      {:ok, new_map_type, transaction}
+    else
+      %Item{deleted?: true} ->
+        Logger.warning("Item already deleted",
+          map: map,
+          key: key
+        )
+
+        {:error, map, transaction}
+
+      err ->
+        Logger.warning("Fail to delete map item by key #{inspect(key)}. Error: #{inspect(err)}",
+          map: map,
+          key: key
+        )
+
+        {:error, map, transaction}
+    end
   end
 
   defdelegate to_list(array), to: Type
@@ -382,7 +413,7 @@ defmodule Y.Type.Map do
       Map.get(map_type, parent_sub)
     end
 
-    defdelegate delete(map_type, transaction, id), to: Y.Type.Map, as: :delete
+    defdelegate delete(map_type, transaction, key), to: Y.Type.Map, as: :delete
 
     def type_ref(_), do: 1
   end

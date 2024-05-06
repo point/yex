@@ -69,6 +69,59 @@ defmodule Y.MapTest do
       {:ok, transaction}
     end)
 
-    # {:ok, map0} = Doc.get(doc, "map0")
+    {:ok, map0} = Doc.get(doc, "map0")
+
+    assert %TMap{
+             map: %{
+               "m1" => [
+                 %Y.Item{
+                   content: [
+                     %Y.Type.Map{
+                       map: %{
+                         "number key" => [
+                           %Y.Item{
+                             length: 1,
+                             content: [1],
+                             parent_name: "map1",
+                             parent_sub: "number key"
+                           }
+                         ]
+                       },
+                       name: "map1"
+                     }
+                   ],
+                   parent_name: "map0",
+                   parent_sub: "m1",
+                   deleted?: false
+                 }
+               ]
+             }
+           } = map0
+
+    assert %TMap{} = inner = TMap.get(map0, "m1")
+    assert 1 === TMap.get(inner, "number key")
+  end
+
+  test "map in map + delete" do
+    {:ok, doc} = Doc.new(name: :map_in_map)
+    {:ok, map0} = Doc.get_map(doc, "map0")
+    {:ok, map1} = Doc.get_map(doc, "map1")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, map1, transaction} = Y.Type.Map.put(map1, transaction, "number key", 1)
+      {:ok, _, transaction} = Y.Type.Map.put(map0, transaction, "m1", map1)
+      {:ok, transaction}
+    end)
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, map1} = Doc.get(transaction, "map1")
+      {:ok, _, transaction} = TMap.delete(map1, transaction, "number key")
+      {:ok, transaction}
+    end)
+
+    assert {:ok, map0} = Doc.get(doc, "map0")
+    assert %TMap{} = map1 = TMap.get(map0, "m1")
+    assert nil == TMap.get(map1, "number key")
+    assert nil == TMap.get_item(map1, "number key")
   end
 end
