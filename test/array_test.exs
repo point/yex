@@ -487,4 +487,27 @@ defmodule Y.ArrayTest do
     %Y.Type.Map{} = map = Enum.at(array, 0)
     assert "new_value" = Y.Type.Map.get(map, "key")
   end
+
+  test "length + delete" do
+    {:ok, doc} = Doc.new(name: :array_length)
+    {:ok, array} = Doc.get_array(doc, "array")
+
+    doc
+    |> Doc.transact(fn transaction ->
+      {:ok, array, transaction} =
+        Array.put(array, transaction, 0, 0)
+        |> Array.put(1, 1)
+        |> Array.put_many(2, [2, 3, 4])
+
+      assert 5 = Array.length(array)
+
+      assert {:ok, array, transaction} = Array.delete(array, transaction, 0)
+      assert 4 = Array.length(array)
+
+      assert {:ok, array, transaction} = Array.delete(array, transaction, 0, 4)
+      assert 0 = Array.length(array)
+
+      {:ok, transaction}
+    end)
+  end
 end

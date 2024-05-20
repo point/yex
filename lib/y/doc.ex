@@ -104,6 +104,19 @@ defmodule Y.Doc do
     GenServer.call(doc_name, {:get_map, map_name})
   end
 
+  def get_text(transaction, text_name \\ UUID.uuid4())
+
+  def get_text(%Transaction{doc: doc} = transaction, text_name) do
+    case do_get_text(doc, text_name) do
+      {:ok, text, doc} -> {:ok, text, %{transaction | doc: doc}}
+      {:error, _} = err -> err
+    end
+  end
+
+  def get_text(doc_name, text_name) do
+    GenServer.call(doc_name, {:get_text, text_name})
+  end
+
   def transact(doc_name, f, opts \\ []) do
     GenServer.call(doc_name, {:transact, f, opts})
   end
@@ -309,6 +322,13 @@ defmodule Y.Doc do
     end
   end
 
+  def handle_call({:get_text, name}, _, doc) do
+    case do_get_text(doc, name) do
+      {:ok, text, doc} -> {:reply, {:ok, text}, doc}
+      {:error, _} = err -> {:reply, err, doc}
+    end
+  end
+
   def handle_call(
         {:transact, f, opts},
         _,
@@ -416,6 +436,22 @@ defmodule Y.Doc do
   defp do_get_map(%Doc{} = doc, name) do
     map = Y.Type.Map.new(doc, name)
     {:ok, map, %Doc{doc | share: Map.put_new(doc.share, name, map)}}
+  end
+
+  defp do_get_text(%Doc{share: share} = doc, name) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        map = Y.Type.Text.from_unknown(u)
+        {:ok, map, %{doc | share: Map.replace(share, name, map)}}
+
+      _ ->
+        {:error, "Type with the name #{name} has already been added"}
+    end
+  end
+
+  defp do_get_text(%Doc{} = doc, name) do
+    text = Y.Type.Text.new(doc, name)
+    {:ok, text, %Doc{doc | share: Map.put_new(doc.share, name, text)}}
   end
 
   defp do_find_parent(type, child_item) do
