@@ -70,7 +70,7 @@ defmodule Y.EncodingDecodingTest do
 
     assert %Y.Item{
              id: %Y.ID{client: 426_441_125, clock: 5},
-             length: 1,
+             length: 0,
              content: [%Y.Content.Deleted{len: 1}],
              origin: %Y.ID{client: 426_441_125, clock: 4},
              right_origin: nil,
@@ -352,7 +352,7 @@ defmodule Y.EncodingDecodingTest do
 
     assert {:ok, array2} = Doc.get(doc2, "array")
 
-    assert [%Y.Item{deleted?: true, content: [0]}] =
+    assert [%Y.Item{deleted?: true, content: [%Y.Content.Deleted{len: 1}]}] =
              Array.to_list(array2, as_items: true, with_deleted: true)
   end
 
@@ -402,7 +402,7 @@ defmodule Y.EncodingDecodingTest do
     {:ok, doc1_instance} = Doc.get_instance(doc1)
     client_id = doc1_instance.client_id
 
-    assert %Y.Item{content: [5], id: %{client: ^client_id}} =
+    assert %Y.Item{content: [%Y.Content.Deleted{len: 1}], id: %{client: ^client_id}} =
              array2
              |> Array.to_list(as_items: true, with_deleted: true)
              |> Enum.find(& &1.deleted?)

@@ -340,19 +340,18 @@ defmodule Y.ArrayTest do
                end
              end)
 
-    assert {:ok, array} =
-             doc
-             |> Doc.transact!(fn transaction ->
-               with {:ok, array} <- Doc.get(transaction, "array"),
-                    {:ok, _array, transaction} <- Array.delete(array, transaction, 5),
-                    do: {:ok, transaction}
-             end)
-             |> Doc.get("array")
+    doc
+    |> Doc.transact!(fn transaction ->
+      {:ok, array} = Doc.get(transaction, "array")
+      {:ok, array, transaction} = Array.delete(array, transaction, 5)
 
-    assert %Item{content: [5]} =
-             Enum.find(Array.to_list(array, as_items: true, with_deleted: true), fn item ->
-               item.deleted?
-             end)
+      assert %Item{content: [5]} =
+               Enum.find(Array.to_list(array, as_items: true, with_deleted: true), fn item ->
+                 item.deleted?
+               end)
+
+      {:ok, transaction}
+    end)
 
     assert {:ok, array} =
              doc

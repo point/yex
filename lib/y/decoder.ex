@@ -238,6 +238,7 @@ defmodule Y.Decoder do
 
   # read deleted content
   defp read_content(1, state, transaction) do
+    # {len, state} = State.read_and_advance(state, :rest, &read_uint/1)
     {len, state} = State.read_len(state)
     {[Y.Content.Deleted.new(len)], state, transaction}
   end

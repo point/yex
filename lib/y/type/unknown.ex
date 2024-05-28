@@ -183,5 +183,7 @@ defmodule Y.Type.Unknown do
     def last(%Unknown{items: items}, _), do: List.last(items)
 
     def type_ref(_), do: -1
+
+    def gc(type), do: type
   end
 end

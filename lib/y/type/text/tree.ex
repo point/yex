@@ -24,7 +24,7 @@ defmodule Y.Type.Text.Tree do
 
     ft =
       cond do
-        index == 0 ->
+        index <= 0 ->
           do_insert(
             FingerTree.finger_tree(meter_object()),
             tree.ft,
@@ -45,9 +45,97 @@ defmodule Y.Type.Text.Tree do
             client_id,
             last_clock
           )
+
+        :otherwise ->
+          {l, v, r} =
+            FingerTree.split(tree.ft, fn %{len: len} ->
+              index <= len
+            end)
+
+          %Meter{len: len_l} = FingerTree.measure(l)
+
+          cond do
+            len_l == index ->
+              do_insert(
+                l,
+                FingerTree.cons(r, v),
+                text,
+                attributes,
+                parent_name,
+                client_id,
+                last_clock
+              )
+
+            len_l + Item.content_length(v) == index ->
+              do_insert(
+                FingerTree.conj(l, v),
+                r,
+                text,
+                attributes,
+                parent_name,
+                client_id,
+                last_clock
+              )
+
+            len_l < index and index < len_l + v.length ->
+              diff = index - len_l
+              {split_l, split_r} = Item.split(v, diff)
+
+              do_insert(
+                FingerTree.conj(l, split_l),
+                FingerTree.cons(r, split_r),
+                text,
+                attributes,
+                parent_name,
+                client_id,
+                last_clock
+              )
+          end
       end
 
     %{tree | ft: ft}
+  end
+
+  def delete(%Tree{} = tree, index, length) do
+    {l, v, r} =
+      FingerTree.split(tree.ft, fn %{len: len} ->
+        index <= len
+      end)
+
+    %Meter{len: len_l} = FingerTree.measure(l)
+
+    {l, collected_items_reverse, right_tree, gathered_attributes} =
+      cond do
+        len_l == index ->
+          do_delete([], FingerTree.cons(r, v), length, %{})
+          |> Tuple.insert_at(0, l)
+
+        len_l + Item.content_length(v) == index ->
+          do_delete([], r, length, %{})
+          |> Tuple.insert_at(0, FingerTree.conj(l, v))
+      end
+
+    left_gathered_attributes = gather_attributes(l)
+
+    r =
+      collected_items_reverse
+      |> Enum.reduce(right_tree, fn
+        %Item{deleted?: true} = item, r ->
+          FingerTree.cons(r, item)
+
+        %Item{content: [%Format{key: key, value: value}]} = item, r ->
+          if Map.get(gathered_attributes, key) != value ||
+               Map.get(left_gathered_attributes, key) == value do
+            FingerTree.cons(r, Item.delete(item))
+          else
+            FingerTree.cons(r, item)
+          end
+
+        item, r ->
+          FingerTree.cons(r, item)
+      end)
+
+    %{tree | ft: FingerTree.append(l, r)}
   end
 
   defp do_insert(
@@ -111,9 +199,6 @@ defmodule Y.Type.Text.Tree do
 
   defp do_gather_attributes(tree, acc) do
     case FingerTree.first(tree) do
-      %Item{deleted?: true} ->
-        do_gather_attributes(FingerTree.rest(tree), acc)
-
       %Item{content: [%Format{} = format]} ->
         do_gather_attributes(FingerTree.rest(tree), Map.merge(acc, Format.to_map(format)))
 
@@ -328,6 +413,41 @@ defmodule Y.Type.Text.Tree do
     {left_tree, right_tree}
   end
 
+  defp do_delete(collected_items, %EmptyTree{} = right_tree, _length, gathered_attributes),
+    do: {collected_items, right_tree, gathered_attributes}
+
+  defp do_delete(collected_items, right_tree, length, gathered_attributes) do
+    case FingerTree.first(right_tree) do
+      %Item{deleted?: true} = item ->
+        do_delete(
+          [item | collected_items],
+          FingerTree.rest(right_tree),
+          length,
+          gathered_attributes
+        )
+
+      %Item{content: [%Format{key: key, value: value}]} = item ->
+        do_delete(
+          [item | collected_items],
+          FingerTree.rest(right_tree),
+          length,
+          Map.put(gathered_attributes, key, value)
+        )
+
+      %Item{} = item ->
+        if length == 0 do
+          {collected_items, right_tree, gathered_attributes}
+        else
+          do_delete(
+            [Item.delete(item) | collected_items],
+            FingerTree.rest(right_tree),
+            length - Item.content_length(item),
+            gathered_attributes
+          )
+        end
+    end
+  end
+
   defp meter_object do
     FingerTree.MeterObject.new(
       fn
@@ -335,7 +455,7 @@ defmodule Y.Type.Text.Tree do
           len =
             case item do
               %Item{content: [%Format{}]} -> 0
-              _ -> Item.content_length(item)
+              _ -> item.length
             end
 
           %Meter{

@@ -112,7 +112,7 @@ defmodule Y.Type.Array.ArrayTree do
   defp meter_object do
     FingerTree.MeterObject.new(
       fn %Item{id: id} = item ->
-        len = Item.content_length(item)
+        len = item.length
 
         %Meter{
           highest_clocks: %{id.client => id.clock},

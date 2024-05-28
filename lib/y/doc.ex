@@ -8,6 +8,8 @@ defmodule Y.Doc do
   alias Y.Transaction
   alias Y.Decoder
 
+  require Logger
+
   @type t :: %__MODULE__{
           gc: term(),
           gc_filter: (-> boolean()) | nil,
@@ -349,6 +351,7 @@ defmodule Y.Doc do
         {:reply, {:ok, name}, new_transaction.doc}
 
       error ->
+        Logger.warning("Transaction failed in doc #{inspect(doc.name)}")
         {:reply, error, doc}
     end
   end

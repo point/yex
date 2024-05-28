@@ -16,6 +16,7 @@ defprotocol Y.Type do
   def last(type, reference_item)
   def delete(type, transaction, id)
   def type_ref(type)
+  def gc(type)
 end
 
 # export const YArrayRefID = 0

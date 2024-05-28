@@ -6,7 +6,9 @@ defmodule Y.Item do
   alias Y.Type
   alias Y.Skip
   alias Y.Content.Binary
+  alias Y.Content.JSON
   alias Y.Content.Deleted
+  alias Y.Content.String, as: ContentString
 
   require Logger
 
@@ -45,7 +47,12 @@ defmodule Y.Item do
       valid_parent?(transaction, item)
   end
 
-  def content_length(%Item{deleted?: true}), do: 0
+  def content_length(%Item{content: [%Y.Content.Binary{}]}), do: 1
+
+  def content_length(%Item{content: [%Y.Content.Deleted{len: len}]}), do: len
+  def content_length(%Item{content: [%Y.Content.Format{}]}), do: 1
+  def content_length(%Item{content: [%Y.Content.JSON{arr: arr}]}), do: length(arr)
+  def content_length(%Item{content: [%Y.Content.String{str: str}]}), do: length(str)
   def content_length(%Item{content: content}) when is_list(content), do: length(content)
   def content_length(%Item{}), do: 1
   def content_length(%Skip{length: len}), do: len
@@ -77,30 +84,45 @@ defmodule Y.Item do
     end
   end
 
-  def split(%Item{content: content} = item, at_index)
-      when at_index >= 0 and at_index < length(content) do
-    {content_l, content_r} = Enum.split(content, at_index)
-    length_l = length(content_l)
-    length_r = length(content_r)
+  def split(%Item{content: content} = item, at_index) do
+    {content_l, content_r} =
+      case content do
+        [%Deleted{len: len}] when at_index >= 0 and at_index < len ->
+          {Deleted.new(at_index), Deleted.new(len - at_index)}
 
-    right_id = ID.new(item.id.client, item.id.clock + length_l)
+        [%JSON{arr: arr}] when at_index >= 0 and at_index < length(arr) ->
+          {l, r} = Enum.split(arr, at_index)
+          {JSON.new(l), JSON.new(r)}
 
-    item_l = %{
-      item
-      | length: length_l,
-        content: content_l,
-        origin: item.origin,
-        right_origin: nil
-    }
+        [%ContentString{str: str}] when at_index >= 0 ->
+          if at_index < String.length(str),
+            do: raise("String is too short to split at #{at_index}")
 
-    item_r = %{
-      item
-      | length: length_r,
-        content: content_r,
-        id: right_id,
-        origin: last_id(item_l),
-        right_origin: item.right_origin
-    }
+          {l, r} = String.split_at(str, at_index)
+          {ContentString.new(l), ContentString.new(r)}
+
+        content when is_list(content) ->
+          {_content_l, _content_r} = Enum.split(content, at_index)
+      end
+
+    item_l =
+      %{
+        item
+        | content: content_l,
+          origin: item.origin,
+          right_origin: nil
+      }
+      |> then(fn item -> %{item | length: content_length(item)} end)
+
+    item_r =
+      %{
+        item
+        | content: content_r,
+          origin: last_id(item_l),
+          right_origin: item.right_origin
+      }
+      |> then(fn item -> %{item | length: content_length(item)} end)
+      |> then(fn item -> %{item | id: ID.new(item.id.client, item.id.clock + item_l.length)} end)
 
     {item_l, item_r}
   end
@@ -112,12 +134,14 @@ defmodule Y.Item do
     [f2 | _] = item2.content
 
     if is_struct(f1) || is_struct(f2) do
-      is_struct(f1) && is_struct(f2) && f1.__struct__ == f2.__struct
+      is_struct(f1) && is_struct(f2) && f1.__struct__ == f2.__struct__
     else
       # && ID.equal?(item1.right_origin, item2.right_origin)
       !is_struct(f1) && !is_struct(f2)
     end
-    |> Kernel.&&(ID.equal?(item2.origin, Item.last_id(item1)))
+    |> Kernel.&&(
+      ID.equal?(item2.origin, Item.last_id(item1)) || ID.equal?(item2.origin, item1.origin)
+    )
     |> Kernel.&&(ID.equal?(item1.right_origin, item2.right_origin))
     |> Kernel.&&(item1.id.client == item2.id.client)
     |> Kernel.&&(item1.id.clock + Item.content_length(item1) == item2.id.clock)
@@ -129,13 +153,27 @@ defmodule Y.Item do
     if mergeable?(item1, item2) do
       %Item{
         item1
-        | content: item1.content ++ item2.content,
-          length: item1.length + item2.length,
+        | content: merge_content(item1.content, item2.content),
           right_origin: item2.right_origin
       }
+      |> then(fn item -> %{item | length: Item.content_length(item)} end)
     else
       raise "cannot merge unmerable items"
     end
+  end
+
+  defp merge_content([%_{} = c1], [%_{} = c2]) do
+    case c1 do
+      %Y.Content.Binary{} -> [Y.Content.Binary.new(c1.content <> c2.content)]
+      %Y.Content.Deleted{} -> [Y.Content.Deleted.new(c1.len + c2.len)]
+      %Y.Content.JSON{} -> [Y.Content.JSON.new(c1.arr ++ c2.arr)]
+      %Y.Content.String{} -> [Y.Content.String.new(c1.str <> c2.str)]
+      _ -> [c1, c2]
+    end
+  end
+
+  defp merge_content(c1, c2) do
+    c1 ++ c2
   end
 
   def content_ref(%Item{content: [content | _]}) do
@@ -245,7 +283,7 @@ defmodule Y.Item do
   end
 
   def delete(%Item{deleted?: true} = item), do: item
-  def delete(%Item{} = item), do: %Item{item | deleted?: true}
+  def delete(%Item{} = item), do: %Item{item | deleted?: true, length: 0}
 
   defp valid_origin?(_, %{origin: nil}), do: true
 

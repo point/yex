@@ -5,6 +5,7 @@ defmodule Y.Encoder do
   alias Y.Type
   alias Y.Encoder.Buffer
   alias Y.Content.Binary
+  alias Y.Content.Deleted
 
   import Y.Encoder.Buffer, only: [write: 3]
   import Y.Encoder.Operations
@@ -119,8 +120,8 @@ defmodule Y.Encoder do
 
   defp write_parent_info(buf, _, _), do: buf
 
-  defp write_content(buf, %Item{content: content}, offset) do
-    len = length(content)
+  defp write_content(buf, %Item{content: content} = item, offset) do
+    len = Item.content_length(item)
 
     buf
     |> write(:length, len - offset)
@@ -160,6 +161,10 @@ defmodule Y.Encoder do
       match?(%Binary{}, c) ->
         content = c.content
         buf |> write(:rest, <<byte_size(content), content::binary>>)
+
+      match?(%Deleted{}, c) ->
+        # length already written
+        buf
 
       is_struct(c) && Type.impl_for(c) != nil ->
         buf |> write(:type_ref, Type.type_ref(c))

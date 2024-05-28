@@ -54,8 +54,21 @@ defmodule Y.Transaction do
         end
       end)
 
+    share =
+      if doc.gc do
+        Enum.reduce(doc.share, %{}, fn {type_name, type}, share ->
+          case type_name in changed_names do
+            true -> Map.put(share, type_name, Type.gc(type))
+            false -> Map.put(share, type_name, type)
+          end
+        end)
+      else
+        doc.share
+      end
+
     %{transaction | delete_set: delete_set}
     |> merge_delete_sets_to_doc()
+    |> update_doc_share(share)
   end
 
   def force_pack(%Transaction{} = transaction), do: %{transaction | need_pack: true}
@@ -83,8 +96,8 @@ defmodule Y.Transaction do
             Map.update(
               ds,
               item.id.client,
-              MapSet.new([{item.id.clock, item.length}]),
-              &MapSet.put(&1, {item.id.clock, item.length})
+              MapSet.new([{item.id.clock, Item.content_length(item)}]),
+              &MapSet.put(&1, {item.id.clock, Item.content_length(item)})
             )
 
           _ ->
@@ -107,6 +120,9 @@ defmodule Y.Transaction do
 
     %{transaction | doc: %{doc | delete_set: ds}}
   end
+
+  defp update_doc_share(%Transaction{doc: doc} = transaction, new_share),
+    do: %{transaction | doc: %{doc | share: new_share}}
 
   # def cleanup(%Doc{} = doc, []), do: doc
   #

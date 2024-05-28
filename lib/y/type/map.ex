@@ -2,6 +2,7 @@ defmodule Y.Type.Map do
   alias Y.Transaction
   alias Y.Type
   alias Y.Type.Unknown
+  alias Y.Content.Deleted
   alias Y.Doc
   alias Y.Item
   alias Y.ID
@@ -416,5 +417,25 @@ defmodule Y.Type.Map do
     defdelegate delete(map_type, transaction, key), to: Y.Type.Map, as: :delete
 
     def type_ref(_), do: 1
+
+    def gc(%Y.Type.Map{map: map} = type_map) do
+      new_map =
+        map
+        |> Enum.reduce([], fn {k, v}, acc ->
+          case v do
+            [%Item{deleted?: false} | _] ->
+              [{k, v} | acc]
+
+            [%Item{content: [%Deleted{}]} | _] ->
+              [{k, v} | acc]
+
+            [%Item{} = item | rest] ->
+              [{k, [%{item | content: [Deleted.from_item(item)]} | rest]} | acc]
+          end
+        end)
+        |> Enum.into(%{})
+
+      %{type_map | map: new_map}
+    end
   end
 end

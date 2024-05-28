@@ -3,9 +3,14 @@ defmodule Y.Type.Text do
   alias Y.Doc
   alias Y.Type
   alias Y.Type.Text.Tree
+  alias Y.Content.Format
+  alias Y.Content.Deleted
+  alias Y.Content.String, as: ContentString
   alias Y.Item
   alias Y.ID
   alias Y.Transaction
+
+  require Logger
 
   defstruct tree: nil,
             doc_name: nil,
@@ -39,8 +44,33 @@ defmodule Y.Type.Text do
     end
   end
 
-  defdelegate to_list(array), to: Type
-  defdelegate to_list(array, opts), to: Type
+  def delete(text, transaction, index, length \\ 1)
+  def delete(_text, transaction, _index, 0), do: {:ok, transaction}
+
+  def delete(text, transaction, index, length) do
+    with new_text = %{text | tree: Tree.delete(text.tree, index, length)},
+         {:ok, transaction} <- Transaction.update(transaction, new_text) do
+      {:ok, new_text, transaction}
+    else
+      _ ->
+        Logger.warning("Fail to delete item(s)",
+          text: text,
+          index: index,
+          length: length
+        )
+
+        {:error, text, transaction}
+    end
+  end
+
+  def to_string(%Text{} = text) do
+    to_list(text)
+    |> Enum.reject(&match?(%Format{}, &1))
+    |> Enum.join()
+  end
+
+  defdelegate to_list(text), to: Type
+  defdelegate to_list(text, opts), to: Type
 
   defimpl Type do
     def highest_clock(%Text{tree: tree}, client), do: Tree.highest_clock(tree, client)
@@ -55,6 +85,7 @@ defmodule Y.Type.Text do
       do: Tree.highest_clock_with_length_by_client_id(tree)
 
     def pack(%Text{tree: tree} = text) do
+      # TODO StringContent
       new_tree =
         tree
         |> Enum.reduce([], fn
@@ -69,6 +100,14 @@ defmodule Y.Type.Text do
             end
         end)
         |> Enum.reverse()
+        |> Enum.map(fn %Item{content: content} = item ->
+          if length(content) > 1 &&
+               Enum.all?(content, fn c -> String.valid?(c) && String.length(c) == 1 end) do
+            %{item | content: ContentString.new(content)}
+          else
+            item
+          end
+        end)
         |> Enum.into(Tree.new())
 
       %{text | tree: new_tree}
@@ -155,6 +194,35 @@ defmodule Y.Type.Text do
     # defdelegate delete(text, transaction, id), to: Y.Type.Array, as: :delete_by_id
 
     def type_ref(_), do: 0
+
+    def gc(%Text{tree: tree} = text) do
+      new_tree =
+        text
+        |> to_list(as_items: true, with_deleted: true)
+        |> Enum.filter(fn
+          %Item{content: [%Deleted{}]} -> false
+          %Item{deleted?: false} -> false
+          _ -> true
+        end)
+        |> case do
+          [] ->
+            tree
+
+          items ->
+            items
+            |> Enum.reduce(tree, fn deleted_item, tree ->
+              with %Item{} = item <- Tree.find(tree, deleted_item.id),
+                   {:ok, new_tree} <-
+                     Tree.replace(tree, item, [%{item | content: [Deleted.from_item(item)]}]) do
+                new_tree
+              else
+                _ -> tree
+              end
+            end)
+        end
+
+      %{text | tree: new_tree}
+    end
   end
 
   # defimpl Enumerable do

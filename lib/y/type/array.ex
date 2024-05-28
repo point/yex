@@ -3,6 +3,7 @@ defmodule Y.Type.Array do
   alias Y.Type.Array.ArrayTree
   alias Y.Type.Unknown
   alias Y.Type
+  alias Y.Content.Deleted
   alias Y.Transaction
   alias Y.Doc
   alias Y.Item
@@ -253,6 +254,35 @@ defmodule Y.Type.Array do
     defdelegate delete(array, transaction, id), to: Y.Type.Array, as: :delete_by_id
 
     def type_ref(_), do: 0
+
+    def gc(%Array{tree: tree} = array) do
+      new_tree =
+        array
+        |> to_list(as_items: true, with_deleted: true)
+        |> Enum.filter(fn
+          %Item{content: [%Deleted{}]} -> false
+          %Item{deleted?: false} -> false
+          _ -> true
+        end)
+        |> case do
+          [] ->
+            tree
+
+          items ->
+            items
+            |> Enum.reduce(tree, fn deleted_item, tree ->
+              with %Item{} = item <- ArrayTree.find(tree, deleted_item.id),
+                   {:ok, new_tree} <-
+                     ArrayTree.replace(tree, item, [%{item | content: [Deleted.from_item(item)]}]) do
+                new_tree
+              else
+                _ -> tree
+              end
+            end)
+        end
+
+      %{array | tree: new_tree}
+    end
   end
 
   defimpl Enumerable do
