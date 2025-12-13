@@ -3,6 +3,7 @@ defmodule Y.Type.Text do
   alias Y.Doc
   alias Y.Type
   alias Y.Type.Text.Tree
+  alias Y.Type.Unknown
   alias Y.Content.Format
   alias Y.Content.Deleted
   alias Y.Content.String, as: ContentString
@@ -47,7 +48,7 @@ defmodule Y.Type.Text do
   def delete(text, transaction, index, length \\ 1)
   def delete(_text, transaction, _index, 0), do: {:ok, transaction}
 
-  def delete(text, transaction, index, length) do
+  def delete(%Text{} = text, %Transaction{} = transaction, index, length) do
     with new_text = %{text | tree: Tree.delete(text.tree, index, length)},
          {:ok, transaction} <- Transaction.update(transaction, new_text) do
       {:ok, new_text, transaction}
@@ -63,10 +64,28 @@ defmodule Y.Type.Text do
     end
   end
 
+  def delete_by_id(%Text{tree: tree} = text, %Transaction{} = transaction, %ID{} = id) do
+    case Tree.find_index(tree, id) do
+      nil -> {:error, text, transaction}
+      idx -> Text.delete(text, transaction, idx)
+    end
+  end
+
   def to_string(%Text{} = text) do
     to_list(text)
     |> Enum.reject(&match?(%Format{}, &1))
     |> Enum.join()
+  end
+
+  def from_unknown(%Unknown{} = u) do
+    tree =
+      u
+      |> Type.to_list(as_items: true, with_deleted: true)
+      |> Enum.reduce(Tree.new(), fn item, tree ->
+        Tree.conj!(tree, item)
+      end)
+
+    %Text{doc_name: u.doc_name, name: u.name, tree: tree}
   end
 
   defdelegate to_list(text), to: Type
@@ -85,7 +104,6 @@ defmodule Y.Type.Text do
       do: Tree.highest_clock_with_length_by_client_id(tree)
 
     def pack(%Text{tree: tree} = text) do
-      # TODO StringContent
       new_tree =
         tree
         |> Enum.reduce([], fn
@@ -223,6 +241,8 @@ defmodule Y.Type.Text do
 
       %{text | tree: new_tree}
     end
+
+    def delete(%Text{} = text, transaction, id), do: Text.delete_by_id(text, transaction, id)
   end
 
   # defimpl Enumerable do

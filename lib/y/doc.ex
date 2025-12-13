@@ -273,8 +273,7 @@ defmodule Y.Doc do
     %{transaction | doc: pack!(doc)}
   end
 
-  def pack!(%Doc{share: share} = doc) do
-    # TODO Pack delete_set
+  def pack!(%Doc{share: share, delete_set: delete_set} = doc) do
     share =
       share
       |> Enum.map(fn {name, type} ->
@@ -282,7 +281,30 @@ defmodule Y.Doc do
       end)
       |> Enum.into(%{})
 
-    %{doc | share: share}
+    delete_set =
+      delete_set
+      |> Enum.map(fn {client, set} ->
+        new_set =
+          set
+          |> Enum.sort_by(fn {clock, _length} -> clock end)
+          |> Enum.reduce([], fn
+            kv, [] ->
+              [kv]
+
+            {clock, length}, [{last_clock, last_length} | rest] = acc ->
+              if last_clock + last_length == clock do
+                [{last_clock, last_length + length} | rest]
+              else
+                [{clock, length} | acc]
+              end
+          end)
+          |> MapSet.new()
+
+        {client, new_set}
+      end)
+      |> Enum.into(%{})
+
+    %{doc | share: share, delete_set: delete_set}
   end
 
   def apply_update(transaction, update) when is_bitstring(update) do

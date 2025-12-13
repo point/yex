@@ -138,6 +138,33 @@ defmodule Y.Type.Text.Tree do
     %{tree | ft: FingerTree.append(l, r)}
   end
 
+  def find_index(%Tree{ft: tree}, id) do
+    {l, v, _} =
+      FingerTree.split(tree, fn %{highest_clocks: clocks} ->
+        case Map.fetch(clocks, id.client) do
+          {:ok, c} -> c >= id.clock
+          _ -> false
+        end
+      end)
+
+    prev = FingerTree.last(l)
+
+    cond do
+      v.id.clock == id.clock ->
+        FingerTree.measure(l).len
+
+      id.clock > v.id.clock && id.clock <= v.id.clock + Item.content_length(v) ->
+        FingerTree.measure(l).len
+
+      prev && id.clock > prev.id.clock &&
+          id.clock <= prev.id.clock + Item.content_length(prev) ->
+        FingerTree.measure(l).len - 1
+
+      :otherwise ->
+        nil
+    end
+  end
+
   defp do_insert(
          left_tree,
          right_tree,

@@ -393,6 +393,111 @@ defmodule Y.TextTest do
     end)
   end
 
+  test "delete by index" do
+    {:ok, doc} = Doc.new(name: :text_delete_by_index)
+    {:ok, _text} = Doc.get_text(doc, "text")
+
+    Doc.transact(doc, fn transaction ->
+      {:ok, text} = Doc.get(transaction, "text")
+      {:ok, text, transaction} = Text.insert(text, transaction, 0, "abc", %{bold: true})
+
+      [format_begin | [l1 | [l2 | _]]] = Text.to_list(text, as_items: true, with_deleted: true)
+
+      {:ok, text_1, transaction} = Text.delete_by_id(text, transaction, format_begin.id)
+      assert [
+               %Y.Item{
+                 id: %Y.ID{client: 2180, clock: 0},
+                 length: 1,
+                 content: [%Y.Content.Format{key: :bold, value: true}],
+                 origin: nil,
+                 right_origin: nil,
+                 parent_name: "text",
+                 parent_sub: nil,
+                 deleted?: false,
+                 keep?: true
+               },
+               %Y.Item{
+                 length: 0,
+                 content: ["a"],
+                 deleted?: true,
+               },
+               %Y.Item{
+                 deleted?: false,
+               },
+               %Y.Item{
+                 deleted?: false,
+               },
+               %Y.Item{
+                 id: %Y.ID{client: 2180, clock: 4},
+                 length: 1,
+                 content: [%Y.Content.Format{key: :bold, value: nil}],
+                 deleted?: false,
+               }
+             ] = Text.to_list(text_1, as_items: true, with_deleted: true)
+
+      {:ok, text_2, transaction} = Text.delete_by_id(text, transaction, l1.id)
+
+      assert [
+               %Y.Item{
+                 id: %Y.ID{client: 2180, clock: 0},
+                 length: 1,
+                 content: [%Y.Content.Format{key: :bold, value: true}],
+                 deleted?: false,
+               },
+               %Y.Item{
+                 length: 0,
+                 content: ["a"],
+                 deleted?: true,
+               },
+               %Y.Item{
+                 deleted?: false,
+               },
+               %Y.Item{
+                 deleted?: false,
+               },
+               %Y.Item{
+                 id: %Y.ID{client: 2180, clock: 4},
+                 length: 1,
+                 content: [%Y.Content.Format{key: :bold, value: nil}],
+                 deleted?: false,
+               }
+             ] = Text.to_list(text_2, as_items: true, with_deleted: true)
+
+      {:ok, text_3, transaction} = Text.delete_by_id(text, transaction, l2.id)
+
+      assert [
+               %Y.Item{
+                 id: %Y.ID{client: 2180, clock: 0},
+                 length: 1,
+                 content: [%Y.Content.Format{key: :bold, value: true}],
+                 deleted?: false,
+               },
+               %Y.Item{
+                 deleted?: false,
+               },
+               %Y.Item{
+                 content: ["b"],
+                 deleted?: true,
+                 length: 0
+               },
+               %Y.Item{
+                 deleted?: false,
+               },
+               %Y.Item{
+                 id: %Y.ID{client: 2180, clock: 4},
+                 length: 1,
+                 content: [%Y.Content.Format{key: :bold, value: nil}],
+                 deleted?: false,
+               }
+             ] = Text.to_list(text_3, as_items: true, with_deleted: true)
+
+
+      assert {:error, _, _} = Text.delete_by_id(text, transaction, %{l2.id | clock: 100})
+
+      {:ok, transaction}
+    end)
+  end
+
   test "pack" do
     {:ok, doc} = Doc.new(name: :text_pack)
     {:ok, _text} = Doc.get_text(doc, "text")
