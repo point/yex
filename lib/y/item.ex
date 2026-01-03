@@ -251,6 +251,9 @@ defmodule Y.Item do
          {:ok, transaction} <- maybe_split_right(item, item.right_origin, transaction),
          {:ok, item, transaction} <- maybe_offset(item, offset, transaction),
          {:ok, type, transaction} <- Doc.get_or_create_unknown(transaction, parent_name) do
+      # Mark item as deleted if it has Deleted content (like Y.js ContentDeleted.integrate)
+      item = integrate_content(item)
+
       with %Item{} = l <- find_left_for(item, type, transaction),
            {:ok, updated_type} <- Type.add_after(type, l, item),
            {:ok, _transaction} = res <- Transaction.update(transaction, updated_type) do
@@ -275,6 +278,14 @@ defmodule Y.Item do
       end
     end
   end
+
+  # Integrate content-specific behavior (like Y.js content.integrate)
+  # For Deleted content, mark the item as deleted
+  defp integrate_content(%Item{content: [%Deleted{}]} = item) do
+    %{item | deleted?: true}
+  end
+
+  defp integrate_content(item), do: item
 
   def explode(%Item{length: 1} = item), do: [item]
 
