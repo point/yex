@@ -13,7 +13,8 @@ defmodule Y.Decoder.State do
   import Y.Decoder.Operations
   import Bitwise
 
-  defstruct key_clock: <<>>,
+  defstruct key_clock: %Y.Decoder.CSState{count: 0, s: 0, buf: <<>>},
+            keys: [],
             client: %Y.Decoder.CSState{count: 0, s: 0, buf: <<>>},
             left_clock: %Y.Decoder.CSDState{count: 0, s: 0, diff: 0, buf: <<>>},
             right_clock: %Y.Decoder.CSDState{count: 0, s: 0, diff: 0, buf: <<>>},
@@ -43,11 +44,12 @@ defmodule Y.Decoder.State do
     <<real_string::binary-size(^string_length), string_lengths::binary>> = rest_string
 
     %State{
-      key_clock: key_clock,
       string: real_string,
       rest: rest,
-      delete_set_cur_val: delete_set_cur_val
+      delete_set_cur_val: delete_set_cur_val,
+      keys: []
     }
+    |> put_in([Access.key!(:key_clock), Access.key!(:buf)], key_clock)
     |> put_in([Access.key!(:client), Access.key!(:buf)], client)
     |> put_in([Access.key!(:info), Access.key!(:buf)], info)
     |> put_in([Access.key!(:length), Access.key!(:buf)], length)
@@ -242,5 +244,42 @@ defmodule Y.Decoder.State do
        | string_lengths: %{state.string_lengths | count: c - 1, s: s, buf: buf},
          string: string_rest
      }}
+  end
+
+  @doc """
+  Read a key using the key clock decoder.
+  If the key clock points to an existing key in the keys array, return it.
+  Otherwise, read a new string and add it to the keys array.
+  """
+  def read_key(%State{key_clock: %{count: c, s: s, buf: buf}, keys: keys} = state) do
+    # First, read the key clock value (similar to other RLE decoders)
+    {c, s, buf} =
+      if c == 0 do
+        # Use read_int_with_sign to detect negative zero (RLE-encoded 0)
+        {s, is_negative?, buf} = read_int_with_sign(buf)
+
+        if is_negative? do
+          {c, buf} = read_uint(buf)
+          {c + 2, s, buf}
+        else
+          {1, s, buf}
+        end
+      else
+        {c, s, buf}
+      end
+
+    key_clock_value = s
+    state = %{state | key_clock: %{state.key_clock | count: c - 1, s: s, buf: buf}}
+
+    # Check if this key clock points to an existing key
+    if key_clock_value < length(keys) do
+      # Return existing key
+      key = Enum.at(keys, key_clock_value)
+      {key, state}
+    else
+      # Read new key from string decoder and add to keys array
+      {key, state} = read_string(state)
+      {key, %{state | keys: keys ++ [key]}}
+    end
   end
 end

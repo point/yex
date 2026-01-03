@@ -51,7 +51,7 @@ defmodule Y.Item do
   def content_length(%Item{content: [%Y.Content.Deleted{len: len}]}), do: len
   def content_length(%Item{content: [%Y.Content.Format{}]}), do: 1
   def content_length(%Item{content: [%Y.Content.JSON{arr: arr}]}), do: length(arr)
-  def content_length(%Item{content: [%Y.Content.String{str: str}]}), do: length(str)
+  def content_length(%Item{content: [%Y.Content.String{str: str}]}), do: String.length(str)
   def content_length(%Item{content: content}) when is_list(content), do: length(content)
   def content_length(%Item{}), do: 1
   def content_length(%Skip{length: len}), do: len

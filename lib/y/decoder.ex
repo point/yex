@@ -242,7 +242,7 @@ defmodule Y.Decoder do
         do_integrate(rest_items, items_to_retry, %{internal_state | transaction: new_transaction})
 
       err ->
-        Logger.warning("Failed to integrate single item", item: item, error: err)
+        Logger.warning("Failed to integrate single item", item: inspect(item, limit: :infinity), error: inspect(err))
         do_integrate(rest_items, items_to_retry, internal_state)
     end
   end
@@ -285,9 +285,11 @@ defmodule Y.Decoder do
   end
 
   # read binary string
+  # In V2, string content is read from the string decoder, not from rest
+  # We wrap it in Y.Content.String so that content_length calculates correctly
   defp read_content(4, state, transaction) do
-    {s, state} = State.read_and_advance(state, :rest, &read_raw_string/1)
-    {[s], state, transaction}
+    {s, state} = State.read_string(state)
+    {[Y.Content.String.new(s)], state, transaction}
   end
 
   # read content embed
@@ -296,8 +298,13 @@ defmodule Y.Decoder do
   end
 
   # read content format
-  defp read_content(6, _state, _) do
-    raise "Don't know how to read content format"
+  defp read_content(6, state, transaction) do
+    {key, state} = State.read_key(state)
+    # readJSON in V2 decoder uses readAny from rest
+    {value, state} = State.read_and_advance(state, :rest, &read_any/1)
+    # Convert string key to atom to match how Yex uses format keys internally
+    key_atom = String.to_atom(key)
+    {[Y.Content.Format.new(key_atom, value)], state, transaction}
   end
 
   # read content type

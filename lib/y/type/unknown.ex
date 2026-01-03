@@ -80,8 +80,15 @@ defmodule Y.Type.Unknown do
       if as_items, do: items, else: items |> Enum.flat_map(& &1.content)
     end
 
-    def find(%Unknown{items: items}, %ID{} = id, default \\ nil),
-      do: items |> Enum.find(default, &(&1.id == id))
+    def find(%Unknown{items: items}, %ID{} = id, default \\ nil) do
+      # Find an item that contains the given clock
+      # An item with id.clock C and length L contains clocks C, C+1, ..., C+L-1
+      Enum.find(items, default, fn item ->
+        item.id.client == id.client &&
+          id.clock >= item.id.clock &&
+          id.clock < item.id.clock + Item.content_length(item)
+      end)
+    end
 
     def unsafe_replace(
           %Unknown{items: items} = type,
