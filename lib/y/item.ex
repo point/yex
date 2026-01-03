@@ -407,6 +407,16 @@ defmodule Y.Item do
       with %Item{} <- end_range do
         range = Type.between(type, start_range.id, end_range.id)
 
+        # When item_right is nil (item.right_origin was null), we need to include
+        # end_range in the conflict resolution. Type.between excludes the right boundary,
+        # so we append end_range when there's no explicit right boundary.
+        range =
+          if item_right == nil do
+            range ++ [end_range]
+          else
+            range
+          end
+
         do_find_left_for(
           item,
           nil,

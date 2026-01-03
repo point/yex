@@ -91,17 +91,22 @@ defmodule Y.Transaction do
   defp put_deleted_to_delete_set(delete_set, type, type_before) do
     Enum.reduce(Type.to_list(type, as_items: true, with_deleted: true), delete_set, fn
       %Item{deleted?: true} = item, ds ->
+        # Check if item existed before and was not deleted
+        # OR if it didn't exist before (new item created and deleted in same transaction)
         case Type.find(type_before, item.id) do
-          %Item{deleted?: false} ->
+          %Item{deleted?: true} ->
+            # Already deleted before this transaction, don't add to delete_set
+            ds
+
+          _ ->
+            # Either newly deleted (was not deleted before) or new item (didn't exist before)
+            # In both cases, add to delete_set
             Map.update(
               ds,
               item.id.client,
               MapSet.new([{item.id.clock, Item.content_length(item)}]),
               &MapSet.put(&1, {item.id.clock, Item.content_length(item)})
             )
-
-          _ ->
-            ds
         end
 
       _, ds ->
