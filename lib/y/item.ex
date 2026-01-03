@@ -48,7 +48,6 @@ defmodule Y.Item do
   end
 
   def content_length(%Item{content: [%Y.Content.Binary{}]}), do: 1
-
   def content_length(%Item{content: [%Y.Content.Deleted{len: len}]}), do: len
   def content_length(%Item{content: [%Y.Content.Format{}]}), do: 1
   def content_length(%Item{content: [%Y.Content.JSON{arr: arr}]}), do: length(arr)
@@ -56,10 +55,12 @@ defmodule Y.Item do
   def content_length(%Item{content: content}) when is_list(content), do: length(content)
   def content_length(%Item{}), do: 1
   def content_length(%Skip{length: len}), do: len
+  def content_length(list) when is_list(list), do: length(list)
+
 
   def id(nil), do: nil
   def id(%Item{id: id}), do: id
-  def last_id(%Item{content: [_], id: id}), do: id
+  def last_id(%Item{content: [_], length: 1, id: id}), do: id
 
   def last_id(%Item{id: id} = item) do
     ID.new(id.client, id.clock + content_length(item) - 1)
@@ -70,13 +71,18 @@ defmodule Y.Item do
   def maybe_offset(%Item{length: length} = item, offset, transaction)
       when offset > 0 and offset < length do
     new_content =
-      if is_list(item.content), do: Enum.slice(item.content, offset), else: item.content
+      if is_list(item.content), do: Enum.drop(item.content, offset), else: item.content
+
+    # When offsetting, the origin should be the ID of the last content element
+    # that we're skipping (i.e., the left item's last ID)
+    new_origin = ID.new(item.id.client, item.id.clock + offset - 1)
 
     with id = ID.new(item.id.client, item.id.clock + offset - 1),
          {:ok, transaction} <- maybe_split_left(item, id, transaction),
          item = %Item{
            item
-           | id: %{id | clock: id.clock + offset},
+           | id: %{id | clock: id.clock + 1},
+             origin: new_origin,
              content: new_content,
              length: content_length(new_content)
          } do
@@ -283,7 +289,12 @@ defmodule Y.Item do
   end
 
   def delete(%Item{deleted?: true} = item), do: item
-  def delete(%Item{} = item), do: %Item{item | deleted?: true, length: 0}
+  def delete(%Item{} = item), do: %Item{item | deleted?: true}
+
+
+  def deleted?(%Item{deleted?: deleted}), do: deleted
+  def deleted?(%Y.GC{}), do: true
+  def deleted?(_), do: false
 
   defp valid_origin?(_, %{origin: nil}), do: true
 

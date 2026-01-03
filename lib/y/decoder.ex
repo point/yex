@@ -503,7 +503,7 @@ defmodule Y.Decoder do
     case find_and_ff(list_to_iterate_over, current_item) do
       [new_f | _] = list ->
         if new_f.id.client != f.id.client ||
-             (f != new_f && new_f.id.clock > current_item.id.clock + current_item.id.length) do
+             (f != new_f && new_f.id.clock > current_item.id.clock + current_item.length) do
           do_merge_structs(list, new_list2, current_item, acc)
         else
           {list, current_item, acc} =
@@ -748,8 +748,11 @@ defmodule Y.Decoder do
 
   defp do_mark_as_deleted(transaction, type, client, clock, clock_end) do
     case Type.delete(type, transaction, ID.new(client, clock)) do
-      {:ok, _, transaction} -> do_mark_as_deleted(transaction, type, client, clock + 1, clock_end)
-      _ -> transaction
+      {:ok, updated_type, transaction} ->
+        do_mark_as_deleted(transaction, updated_type, client, clock + 1, clock_end)
+
+      _ ->
+        transaction
     end
   end
 
@@ -783,5 +786,25 @@ defmodule Y.Decoder do
             )
           )
     }
+  end
+
+  # Decode a state vector from binary format (V1 simple format)
+  # Format: num_clients, then for each: client_id, clock (all VarUints)
+  def decode_state_vector(<<0>>), do: %{}
+
+  def decode_state_vector(binary) do
+    {num_clients, rest} = read_uint(binary)
+
+    if num_clients == 0 do
+      %{}
+    else
+      1..num_clients//1
+      |> Enum.reduce({%{}, rest}, fn _, {sv, rest} ->
+        {client, rest} = read_uint(rest)
+        {clock, rest} = read_uint(rest)
+        {Map.put(sv, client, clock), rest}
+      end)
+      |> elem(0)
+    end
   end
 end

@@ -26,7 +26,8 @@ defmodule Y.Type.Map do
         key,
         content
       ) do
-    clock_length = Doc.highest_clock_with_length(transaction)
+    # Must get clock for THIS client only, not the max across all clients
+    clock_length = Doc.highest_clock_with_length(transaction, transaction.doc.client_id)
 
     item =
       Item.new(

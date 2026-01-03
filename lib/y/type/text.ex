@@ -28,7 +28,8 @@ defmodule Y.Type.Text do
         text,
         attributes \\ %{}
       ) do
-    with last_clock = Doc.highest_clock_with_length(transaction),
+    # Must get clock for THIS client only, not the max across all clients
+    with last_clock = Doc.highest_clock_with_length(transaction, transaction.doc.client_id),
          %Tree{} = new_tree <-
            Tree.insert(
              tree,

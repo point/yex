@@ -32,7 +32,7 @@ defmodule Y.Doc do
   defstruct name: nil,
             gc: nil,
             gc_filter: nil,
-            client_id: System.unique_integer([:positive]),
+            client_id: nil,
             collection_id: nil,
             share: %{},
             transaction: nil,
@@ -67,7 +67,8 @@ defmodule Y.Doc do
       gc_filter: opts[:gc_filter],
       meta: opts[:meta],
       autoload: opts[:autoload],
-      should_load: opts[:should_load]
+      should_load: opts[:should_load],
+      client_id: opts[:client_id]
     }
 
     {:ok, doc}
@@ -391,7 +392,8 @@ defmodule Y.Doc do
         gc_filter: fn -> true end,
         meta: nil,
         autoload: false,
-        should_load: true
+        should_load: true,
+        client_id: System.unique_integer([:positive])
       ],
       opts
     )

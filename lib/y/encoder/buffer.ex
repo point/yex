@@ -93,6 +93,8 @@ defmodule Y.Encoder.Buffer do
     |> Kernel.<>(Bufferable.dump(b.length) |> write_bitstring())
     |> Kernel.<>(b.rest)
   end
+
+  def dump_rest_only!(%Buffer{} = b), do: b.rest
 end
 
 # const encoder = encoding.createEncoder()

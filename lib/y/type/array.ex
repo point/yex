@@ -46,6 +46,10 @@ defmodule Y.Type.Array do
     end
   end
 
+  def append(array, %Transaction{} = transaction, content) do
+    put(array, transaction, __MODULE__.length(array), content)
+  end
+
   defdelegate to_list(array), to: Type
   defdelegate to_list(array, opts), to: Type
 
@@ -120,7 +124,8 @@ defmodule Y.Type.Array do
          content
        )
        when is_list(content) do
-    clock_length = Doc.highest_clock_with_length(transaction)
+    # Must get clock for THIS client only, not the max across all clients
+    clock_length = Doc.highest_clock_with_length(transaction, doc.client_id)
 
     item =
       Item.new(

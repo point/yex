@@ -69,39 +69,41 @@ defmodule Y.Type.Array.ArrayTree do
         cond do
           len_l + v.length == index ->
             next = FingerTree.first(r)
-            item = %{item | origin: Item.last_id(v), right_origin: Item.id(next)}
+            right_origin = Item.id(next)
+            item = %{item | origin: Item.last_id(v), right_origin: right_origin}
 
             l
             |> FingerTree.conj(v)
             |> then(fn tree ->
-              Enum.reduce(Item.explode(item), tree, fn item, tree ->
+              # Explode and preserve right_origin for all items in the sequence
+              Item.explode(item)
+              |> Enum.map(fn i -> %{i | right_origin: right_origin} end)
+              |> Enum.reduce(tree, fn item, tree ->
                 FingerTree.conj(tree, item)
               end)
             end)
-            |> then(fn tree ->
-              if next do
-                tree
-                |> FingerTree.conj(%{next | origin: Item.last_id(item)})
-                |> FingerTree.append(FingerTree.rest(r))
-              else
-                tree |> FingerTree.append(r)
-              end
-            end)
+            # Don't modify existing items' origins - just append them as-is
+            |> FingerTree.append(r)
 
           len_l < index and index < len_l + v.length ->
             diff = index - len_l
             {split_l, split_r} = Item.split(v, diff)
 
-            item = %{item | origin: Item.last_id(split_l), right_origin: Item.id(split_r)}
+            right_origin = Item.id(split_r)
+            item = %{item | origin: Item.last_id(split_l), right_origin: right_origin}
 
             l
             |> FingerTree.conj(split_l)
             |> then(fn tree ->
-              Enum.reduce(Item.explode(item), tree, fn item, tree ->
+              # Explode and preserve right_origin for all items in the sequence
+              Item.explode(item)
+              |> Enum.map(fn i -> %{i | right_origin: right_origin} end)
+              |> Enum.reduce(tree, fn item, tree ->
                 FingerTree.conj(tree, item)
               end)
             end)
-            |> FingerTree.conj(%{split_r | origin: Item.last_id(item)})
+            # Don't modify split_r's origin - keep it pointing to split_l
+            |> FingerTree.conj(split_r)
             |> FingerTree.append(r)
         end
       end
