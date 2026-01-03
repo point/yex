@@ -242,7 +242,11 @@ defmodule Y.Decoder do
         do_integrate(rest_items, items_to_retry, %{internal_state | transaction: new_transaction})
 
       err ->
-        Logger.warning("Failed to integrate single item", item: inspect(item, limit: :infinity), error: inspect(err))
+        Logger.warning("Failed to integrate single item",
+          item: inspect(item, limit: :infinity),
+          error: inspect(err)
+        )
+
         do_integrate(rest_items, items_to_retry, internal_state)
     end
   end

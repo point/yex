@@ -84,12 +84,12 @@ defmodule Y.Type.GeneralTree do
 
           # Check if id is within v's range (same client)
           v != nil && v.id.client == id.client &&
-              id.clock > v.id.clock && id.clock <= v.id.clock + Item.content_length(v) - 1 ->
+            id.clock > v.id.clock && id.clock <= v.id.clock + Item.content_length(v) - 1 ->
             v
 
           # Check prev (same client)
           prev != nil && prev.id.client == id.client &&
-              id.clock >= prev.id.clock &&
+            id.clock >= prev.id.clock &&
               id.clock <= prev.id.clock + Item.content_length(prev) - 1 ->
             prev
 
@@ -172,8 +172,14 @@ defmodule Y.Type.GeneralTree do
       end
 
       # Linear search fallback for transform when items aren't in clock order
-      defp do_transform_linear(%unquote(mod){ft: tree} = array_tree, %Item{} = starting_item, acc, fun) do
+      defp do_transform_linear(
+             %unquote(mod){ft: tree} = array_tree,
+             %Item{} = starting_item,
+             acc,
+             fun
+           ) do
         empty_tree = FingerTree.finger_tree(tree.meter_object)
+
         case find_item_linear(tree, starting_item, empty_tree) do
           {:found, l, v, r} ->
             new_tree =
@@ -181,6 +187,7 @@ defmodule Y.Type.GeneralTree do
                 {left_tree, nil} -> left_tree
                 {left_tree, right_tree} -> FingerTree.append(left_tree, right_tree)
               end
+
             {:ok, %{array_tree | ft: new_tree}}
 
           :not_found ->
@@ -291,6 +298,7 @@ defmodule Y.Type.GeneralTree do
 
       defp do_add_after_linear(%unquote(mod){ft: tree} = at, %Item{} = after_item, %Item{} = item) do
         empty_tree = FingerTree.finger_tree(tree.meter_object)
+
         case find_item_linear(tree, after_item, empty_tree) do
           {:found, l, v, r} ->
             {:ok,
@@ -350,8 +358,13 @@ defmodule Y.Type.GeneralTree do
         end
       end
 
-      defp do_add_before_linear(%unquote(mod){ft: tree} = at, %Item{} = before_item, %Item{} = item) do
+      defp do_add_before_linear(
+             %unquote(mod){ft: tree} = at,
+             %Item{} = before_item,
+             %Item{} = item
+           ) do
         empty_tree = FingerTree.finger_tree(tree.meter_object)
+
         case find_item_linear(tree, before_item, empty_tree) do
           {:found, l, v, r} ->
             {:ok,

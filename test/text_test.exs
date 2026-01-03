@@ -404,6 +404,7 @@ defmodule Y.TextTest do
       [format_begin | [l1 | [l2 | _]]] = Text.to_list(text, as_items: true, with_deleted: true)
 
       {:ok, text_1, transaction} = Text.delete_by_id(text, transaction, format_begin.id)
+
       assert [
                %Y.Item{
                  id: %Y.ID{clock: 0},
@@ -419,19 +420,19 @@ defmodule Y.TextTest do
                %Y.Item{
                  length: 1,
                  content: ["a"],
-                 deleted?: true,
+                 deleted?: true
                },
                %Y.Item{
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
                  id: %Y.ID{clock: 4},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: nil}],
-                 deleted?: false,
+                 deleted?: false
                }
              ] = Text.to_list(text_1, as_items: true, with_deleted: true)
 
@@ -442,24 +443,24 @@ defmodule Y.TextTest do
                  id: %Y.ID{clock: 0},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: true}],
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
                  length: 1,
                  content: ["a"],
-                 deleted?: true,
+                 deleted?: true
                },
                %Y.Item{
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
                  id: %Y.ID{clock: 4},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: nil}],
-                 deleted?: false,
+                 deleted?: false
                }
              ] = Text.to_list(text_2, as_items: true, with_deleted: true)
 
@@ -470,10 +471,10 @@ defmodule Y.TextTest do
                  id: %Y.ID{clock: 0},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: true}],
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
                  content: ["b"],
@@ -481,16 +482,15 @@ defmodule Y.TextTest do
                  length: 1
                },
                %Y.Item{
-                 deleted?: false,
+                 deleted?: false
                },
                %Y.Item{
                  id: %Y.ID{clock: 4},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: nil}],
-                 deleted?: false,
+                 deleted?: false
                }
              ] = Text.to_list(text_3, as_items: true, with_deleted: true)
-
 
       assert {:error, _, _} = Text.delete_by_id(text, transaction, %{l2.id | clock: 100})
 

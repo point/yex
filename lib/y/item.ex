@@ -57,7 +57,6 @@ defmodule Y.Item do
   def content_length(%Skip{length: len}), do: len
   def content_length(list) when is_list(list), do: length(list)
 
-
   def id(nil), do: nil
   def id(%Item{id: id}), do: id
   def last_id(%Item{content: [_], length: 1, id: id}), do: id
@@ -264,6 +263,7 @@ defmodule Y.Item do
 
         nil ->
           first = Type.first(type, item)
+
           case Type.add_before(type, first, item) do
             {:ok, updated_type} ->
               Transaction.update(transaction, updated_type)
@@ -302,7 +302,6 @@ defmodule Y.Item do
 
   def delete(%Item{deleted?: true} = item), do: item
   def delete(%Item{} = item), do: %Item{item | deleted?: true}
-
 
   def deleted?(%Item{deleted?: deleted}), do: deleted
   def deleted?(%Y.GC{}), do: true

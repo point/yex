@@ -263,7 +263,6 @@ defmodule Y.Encoder do
               end)
             end
 
-
           buffer
           |> write(:rest, write_uint(length(structs_to_write)))
           |> write(:client, client)

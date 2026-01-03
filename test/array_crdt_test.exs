@@ -8,8 +8,6 @@ defmodule Y.ArrayCRDTTest do
   alias Y.Doc
   alias Y.Type.Array
   alias Y.Encoder
-  alias Y.Decoder
-  alias Y.Transaction
 
   # ============================================================================
   # Commutativity Tests
@@ -779,84 +777,83 @@ defmodule Y.ArrayCRDTTest do
   # Convergence Tests
   # ============================================================================
 
-  @doc """
-  Test convergence: After sync, all replicas have identical state.
-  """
+  # @doc """
+  # Test convergence: After sync, all replicas have identical state.
+  # """
 
-  # test "convergence after concurrent edits" do
-  #   {:ok, doc0} = Doc.new(name: :conv_0, client_id: 0)
-  #   {:ok, doc1} = Doc.new(name: :conv_1, client_id: 1)
-  #   {:ok, doc2} = Doc.new(name: :conv_2, client_id: 2)
-  #
-  #   {:ok, arr0} = Doc.get_array(doc0, "array")
-  #   {:ok, _arr1} = Doc.get_array(doc1, "array")
-  #   {:ok, _arr2} = Doc.get_array(doc2, "array")
-  #
-  #   # Setup initial state
-  #   Doc.transact!(doc0, fn transaction ->
-  #     {:ok, _arr, transaction} = Array.put(arr0, transaction, 0, "initial")
-  #     {:ok, transaction}
-  #   end)
-  #
-  #   # Sync initial state to all docs
-  #   initial_update = Encoder.encode(doc0)
-  #
-  #   Doc.transact!(doc1, fn transaction ->
-  #     {:ok, Doc.apply_update(transaction, initial_update)}
-  #   end)
-  #   Doc.transact!(doc2, fn transaction ->
-  #     {:ok, Doc.apply_update(transaction, initial_update)}
-  #   end)
-  #
-  #   # Make concurrent edits (disconnected)
-  #   Doc.transact!(doc0, fn transaction ->
-  #     {:ok, arr} = Doc.get(transaction, "array")
-  #     {:ok, arr, transaction} = Array.put(arr, transaction, 0, "user0-prefix")
-  #     {:ok, _arr, transaction} = Array.put(arr, transaction, Array.length(arr), "user0-suffix")
-  #     {:ok, transaction}
-  #   end)
-  #
-  #   Doc.transact!(doc1, fn transaction ->
-  #     {:ok, arr} = Doc.get(transaction, "array")
-  #     {:ok, arr, transaction} = Array.put(arr, transaction, 1, "user1-middle")
-  #     {:ok, _arr, transaction} = Array.delete(arr, transaction, 0)
-  #     {:ok, transaction}
-  #   end)
-  #
-  #   Doc.transact!(doc2, fn transaction ->
-  #     {:ok, arr} = Doc.get(transaction, "array")
-  #     {:ok, arr, transaction} = Array.put(arr, transaction, Array.length(arr), "user2-end")
-  #     {:ok, _arr, transaction} = Array.put(arr, transaction, 0, "user2-start")
-  #     {:ok, transaction}
-  #   end)
-  #
-  #   # Get updates from each doc
-  #   update0 = Encoder.encode(doc0)
-  #   update1 = Encoder.encode(doc1)
-  #   update2 = Encoder.encode(doc2)
-  #
-  #   # Sync all updates to all docs
-  #   for {doc, updates} <- [
-  #     {doc0, [update1, update2]},
-  #     {doc1, [update0, update2]},
-  #     {doc2, [update0, update1]}
-  #   ] do
-  #     Enum.each(updates, fn update ->
-  #       Doc.transact!(doc, fn transaction ->
-  #         dbg update
-  #         {:ok, Doc.apply_update(transaction, update)}
-  #       end)
-  #     end)
-  #   end
-  #
-  #   # After sync, all states must be identical
-  #   {:ok, arr0_final} = Doc.get(doc0, "array")
-  #   {:ok, arr1_final} = Doc.get(doc1, "array")
-  #   {:ok, arr2_final} = Doc.get(doc2, "array")
-  #
-  #   assert Array.to_list(arr0_final) == Array.to_list(arr1_final), "User 0 and 1 converged"
-  #   assert Array.to_list(arr1_final) == Array.to_list(arr2_final), "User 1 and 2 converged"
-  # end
+  test "convergence after concurrent edits" do
+    {:ok, doc0} = Doc.new(name: :conv_0, client_id: 0)
+    {:ok, doc1} = Doc.new(name: :conv_1, client_id: 1)
+    {:ok, doc2} = Doc.new(name: :conv_2, client_id: 2)
+
+    {:ok, arr0} = Doc.get_array(doc0, "array")
+    {:ok, _arr1} = Doc.get_array(doc1, "array")
+    {:ok, _arr2} = Doc.get_array(doc2, "array")
+
+    # Setup initial state
+    Doc.transact!(doc0, fn transaction ->
+      {:ok, _arr, transaction} = Array.put(arr0, transaction, 0, "initial")
+      {:ok, transaction}
+    end)
+
+    # Sync initial state to all docs
+    initial_update = Encoder.encode(doc0)
+
+    Doc.transact!(doc1, fn transaction ->
+      {:ok, Doc.apply_update(transaction, initial_update)}
+    end)
+    Doc.transact!(doc2, fn transaction ->
+      {:ok, Doc.apply_update(transaction, initial_update)}
+    end)
+
+    # Make concurrent edits (disconnected)
+    Doc.transact!(doc0, fn transaction ->
+      {:ok, arr} = Doc.get(transaction, "array")
+      {:ok, arr, transaction} = Array.put(arr, transaction, 0, "user0-prefix")
+      {:ok, _arr, transaction} = Array.put(arr, transaction, Array.length(arr), "user0-suffix")
+      {:ok, transaction}
+    end)
+
+    Doc.transact!(doc1, fn transaction ->
+      {:ok, arr} = Doc.get(transaction, "array")
+      {:ok, arr, transaction} = Array.put(arr, transaction, 1, "user1-middle")
+      {:ok, _arr, transaction} = Array.delete(arr, transaction, 0)
+      {:ok, transaction}
+    end)
+
+    Doc.transact!(doc2, fn transaction ->
+      {:ok, arr} = Doc.get(transaction, "array")
+      {:ok, arr, transaction} = Array.put(arr, transaction, Array.length(arr), "user2-end")
+      {:ok, _arr, transaction} = Array.put(arr, transaction, 0, "user2-start")
+      {:ok, transaction}
+    end)
+
+    # Get updates from each doc
+    update0 = Encoder.encode(doc0)
+    update1 = Encoder.encode(doc1)
+    update2 = Encoder.encode(doc2)
+
+    # Sync all updates to all docs
+    for {doc, updates} <- [
+      {doc0, [update1, update2]},
+      {doc1, [update0, update2]},
+      {doc2, [update0, update1]}
+    ] do
+      Enum.each(updates, fn update ->
+        Doc.transact!(doc, fn transaction ->
+          {:ok, Doc.apply_update(transaction, update)}
+        end)
+      end)
+    end
+
+    # After sync, all states must be identical
+    {:ok, arr0_final} = Doc.get(doc0, "array")
+    {:ok, arr1_final} = Doc.get(doc1, "array")
+    {:ok, arr2_final} = Doc.get(doc2, "array")
+
+    assert Array.to_list(arr0_final) == Array.to_list(arr1_final), "User 0 and 1 converged"
+    assert Array.to_list(arr1_final) == Array.to_list(arr2_final), "User 1 and 2 converged"
+  end
 
   # ============================================================================
   # Out-of-Order Delivery Test
@@ -914,7 +911,7 @@ defmodule Y.ArrayCRDTTest do
       {:ok, transaction}
     end)
 
-    update_full_1_2 = Encoder.encode(doc)
+    _update_full_1_2 = Encoder.encode(doc)
 
     Doc.transact!(doc, fn transaction ->
       {:ok, arr} = Doc.get(transaction, "array")
@@ -1649,8 +1646,6 @@ defmodule Y.ArrayCRDTTest do
   """
   test "merge from many divergent peers" do
     num_peers = 10
-    updates = []
-
     # Create many independent peers with deterministic client IDs
     updates =
       for i <- 0..(num_peers - 1) do
@@ -2373,12 +2368,41 @@ defmodule Y.ArrayCRDTTest do
 
     # Sync to user 1
     update_a = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update_a) == [0, 0, 1, 1, 0, 0, 1, 8, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 1, 1, 1, 1, 0, 119, 1, 65, 0]
+
+    assert :binary.bin_to_list(update_a) == [
+             0,
+             0,
+             1,
+             1,
+             0,
+             0,
+             1,
+             8,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             1,
+             1,
+             1,
+             1,
+             0,
+             119,
+             1,
+             65,
+             0
+           ]
 
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update_a)}
     end)
-
 
     # User 1 sees A and appends B
     Doc.transact!(doc1, fn transaction ->
@@ -2389,12 +2413,52 @@ defmodule Y.ArrayCRDTTest do
 
     # Sync B back to user 0
     update_b = Encoder.encode(doc1)
-    assert :binary.bin_to_list(update_b) == [0, 0, 3, 2, 65, 0, 1, 0, 0, 3, 136, 0, 8, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 2, 65, 0, 2, 1, 0, 119, 1, 66, 1, 0, 119, 1, 65, 0]
+
+    assert :binary.bin_to_list(update_b) == [
+             0,
+             0,
+             3,
+             2,
+             65,
+             0,
+             1,
+             0,
+             0,
+             3,
+             136,
+             0,
+             8,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             2,
+             65,
+             0,
+             2,
+             1,
+             0,
+             119,
+             1,
+             66,
+             1,
+             0,
+             119,
+             1,
+             65,
+             0
+           ]
 
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update_b)}
     end)
-
 
     # User 0 sees B and appends C
     Doc.transact!(doc0, fn transaction ->
@@ -2406,7 +2470,54 @@ defmodule Y.ArrayCRDTTest do
     # Sync C back to user 1
     update_c = Encoder.encode(doc0)
 
-    assert :binary.bin_to_list(update_c) == [0, 0, 4, 2, 65, 0, 2, 2, 1, 0, 0, 5, 136, 0, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 2, 65, 1, 2, 1, 0, 119, 1, 66, 2, 0, 119, 1, 65, 119, 1, 67, 0]
+    assert :binary.bin_to_list(update_c) == [
+             0,
+             0,
+             4,
+             2,
+             65,
+             0,
+             2,
+             2,
+             1,
+             0,
+             0,
+             5,
+             136,
+             0,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             2,
+             65,
+             1,
+             2,
+             1,
+             0,
+             119,
+             1,
+             66,
+             2,
+             0,
+             119,
+             1,
+             65,
+             119,
+             1,
+             67,
+             0
+           ]
 
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update_c)}
@@ -2878,7 +2989,7 @@ defmodule Y.ArrayCRDTTest do
     {:ok, doc1} = Doc.new(name: :rapid_1, client_id: 1)
     {:ok, doc2} = Doc.new(name: :rapid_2, client_id: 2)
 
-    {:ok, arr0} = Doc.get_array(doc0, "array")
+    {:ok, _arr0} = Doc.get_array(doc0, "array")
     {:ok, _arr1} = Doc.get_array(doc1, "array")
     {:ok, _arr2} = Doc.get_array(doc2, "array")
 
@@ -3092,6 +3203,7 @@ defmodule Y.ArrayCRDTTest do
 
     # Get incremental update from doc1 for doc2
     update_for_2 = Encoder.encode_state_as_update(doc1, sv2)
+
     assert :binary.bin_to_list(update_for_2) == [
              0,
              0,
@@ -3120,6 +3232,7 @@ defmodule Y.ArrayCRDTTest do
 
     # Get incremental update from doc2 for doc1
     update_for_1 = Encoder.encode_state_as_update(doc2, sv1)
+
     assert :binary.bin_to_list(update_for_1) == [
              0,
              0,
@@ -3307,7 +3420,38 @@ defmodule Y.ArrayCRDTTest do
 
     # Sync to doc1
     update0 = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update0) == [0, 0, 1, 1, 0, 0, 1, 8, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 1, 1, 1, 1, 0, 119, 1, 65, 0]
+
+    assert :binary.bin_to_list(update0) == [
+             0,
+             0,
+             1,
+             1,
+             0,
+             0,
+             1,
+             8,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             1,
+             1,
+             1,
+             1,
+             0,
+             119,
+             1,
+             65,
+             0
+           ]
+
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update0)}
     end)
@@ -3318,8 +3462,51 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "offline-0")
       {:ok, transaction}
     end)
+
     update1 = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update1) == [0, 0, 1, 1, 0, 0, 1, 8, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 1, 2, 1, 1, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 0]
+
+    assert :binary.bin_to_list(update1) == [
+             0,
+             0,
+             1,
+             1,
+             0,
+             0,
+             1,
+             8,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             1,
+             2,
+             1,
+             1,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             0
+           ]
+
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update1)}
     end)
@@ -3330,8 +3517,78 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "after-reconnect-0")
       {:ok, transaction}
     end)
+
     update2 = Encoder.encode(doc1)
-    assert :binary.bin_to_list(update2) == [0, 0, 3, 2, 65, 0, 1, 2, 0, 3, 136, 0, 8, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 2, 1, 2, 2, 1, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 1, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 0]
+
+    assert :binary.bin_to_list(update2) == [
+             0,
+             0,
+             3,
+             2,
+             65,
+             0,
+             1,
+             2,
+             0,
+             3,
+             136,
+             0,
+             8,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             2,
+             1,
+             2,
+             2,
+             1,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             1,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             0
+           ]
+
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update2)}
     end)
@@ -3342,8 +3599,94 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "offline-1")
       {:ok, transaction}
     end)
+
     update3 = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update3) == [0, 0, 4, 2, 65, 0, 2, 2, 2, 66, 0, 5, 136, 0, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 3, 1, 2, 1, 2, 1, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 2, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 0]
+
+    assert :binary.bin_to_list(update3) == [
+             0,
+             0,
+             4,
+             2,
+             65,
+             0,
+             2,
+             2,
+             2,
+             66,
+             0,
+             5,
+             136,
+             0,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             3,
+             1,
+             2,
+             1,
+             2,
+             1,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             2,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             0
+           ]
+
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update3)}
     end)
@@ -3354,8 +3697,115 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "after-reconnect-1")
       {:ok, transaction}
     end)
+
     update4 = Encoder.encode(doc1)
-    assert :binary.bin_to_list(update4) == [0, 0, 4, 2, 65, 1, 2, 3, 3, 0, 68, 0, 5, 136, 1, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 4, 65, 0, 2, 1, 2, 2, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 2, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 0]
+
+    assert :binary.bin_to_list(update4) == [
+             0,
+             0,
+             4,
+             2,
+             65,
+             1,
+             2,
+             3,
+             3,
+             0,
+             68,
+             0,
+             5,
+             136,
+             1,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             4,
+             65,
+             0,
+             2,
+             1,
+             2,
+             2,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             2,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             0
+           ]
+
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update4)}
     end)
@@ -3366,8 +3816,129 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "offline-2")
       {:ok, transaction}
     end)
+
     update5 = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update5) == [0, 0, 5, 2, 65, 1, 66, 0, 4, 3, 0, 68, 2, 0, 5, 136, 1, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 5, 65, 0, 2, 65, 0, 2, 2, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 3, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 50, 0]
+
+    assert :binary.bin_to_list(update5) == [
+             0,
+             0,
+             5,
+             2,
+             65,
+             1,
+             66,
+             0,
+             4,
+             3,
+             0,
+             68,
+             2,
+             0,
+             5,
+             136,
+             1,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             5,
+             65,
+             0,
+             2,
+             65,
+             0,
+             2,
+             2,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             3,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             50,
+             0
+           ]
+
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update5)}
     end)
@@ -3378,8 +3949,148 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "after-reconnect-2")
       {:ok, transaction}
     end)
+
     update6 = Encoder.encode(doc1)
-    assert :binary.bin_to_list(update6) == [0, 0, 5, 2, 65, 2, 66, 0, 4, 3, 1, 70, 2, 0, 5, 136, 2, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 5, 65, 1, 2, 65, 0, 2, 3, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 50, 3, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 50, 0]
+
+    assert :binary.bin_to_list(update6) == [
+             0,
+             0,
+             5,
+             2,
+             65,
+             2,
+             66,
+             0,
+             4,
+             3,
+             1,
+             70,
+             2,
+             0,
+             5,
+             136,
+             2,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             5,
+             65,
+             1,
+             2,
+             65,
+             0,
+             2,
+             3,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             50,
+             3,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             50,
+             0
+           ]
+
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update6)}
     end)
@@ -3390,8 +4101,160 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "offline-3")
       {:ok, transaction}
     end)
+
     update7 = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update7) == [0, 0, 5, 2, 65, 2, 66, 1, 5, 3, 1, 70, 3, 0, 0, 5, 136, 2, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 5, 65, 1, 2, 65, 1, 2, 3, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 50, 4, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 50, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 51, 0]
+
+    assert :binary.bin_to_list(update7) == [
+             0,
+             0,
+             5,
+             2,
+             65,
+             2,
+             66,
+             1,
+             5,
+             3,
+             1,
+             70,
+             3,
+             0,
+             0,
+             5,
+             136,
+             2,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             5,
+             65,
+             1,
+             2,
+             65,
+             1,
+             2,
+             3,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             50,
+             4,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             50,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             51,
+             0
+           ]
+
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update7)}
     end)
@@ -3402,8 +4265,179 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "after-reconnect-3")
       {:ok, transaction}
     end)
+
     update8 = Encoder.encode(doc1)
-    assert :binary.bin_to_list(update8) == [0, 0, 5, 2, 65, 3, 66, 1, 5, 3, 2, 72, 3, 0, 0, 5, 136, 3, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 5, 65, 2, 2, 65, 1, 2, 4, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 50, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 51, 4, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 50, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 51, 0]
+
+    assert :binary.bin_to_list(update8) == [
+             0,
+             0,
+             5,
+             2,
+             65,
+             3,
+             66,
+             1,
+             5,
+             3,
+             2,
+             72,
+             3,
+             0,
+             0,
+             5,
+             136,
+             3,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             5,
+             65,
+             2,
+             2,
+             65,
+             1,
+             2,
+             4,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             50,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             51,
+             4,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             50,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             51,
+             0
+           ]
+
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update8)}
     end)
@@ -3414,8 +4448,190 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "offline-4")
       {:ok, transaction}
     end)
+
     update9 = Encoder.encode(doc0)
-    assert :binary.bin_to_list(update9) == [0, 0, 5, 2, 65, 3, 66, 2, 5, 3, 2, 72, 3, 1, 0, 5, 136, 3, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 5, 65, 2, 2, 65, 2, 2, 4, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 50, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 51, 5, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 50, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 51, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 52, 0]
+
+    assert :binary.bin_to_list(update9) == [
+             0,
+             0,
+             5,
+             2,
+             65,
+             3,
+             66,
+             2,
+             5,
+             3,
+             2,
+             72,
+             3,
+             1,
+             0,
+             5,
+             136,
+             3,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             5,
+             65,
+             2,
+             2,
+             65,
+             2,
+             2,
+             4,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             50,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             51,
+             5,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             50,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             51,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             52,
+             0
+           ]
+
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, update9)}
     end)
@@ -3426,8 +4642,209 @@ defmodule Y.ArrayCRDTTest do
       {:ok, _arr, transaction} = Array.append(arr, transaction, "after-reconnect-4")
       {:ok, transaction}
     end)
+
     update10 = Encoder.encode(doc1)
-    assert :binary.bin_to_list(update10) == [0, 0, 5, 2, 65, 4, 66, 2, 5, 3, 3, 74, 3, 1, 0, 5, 136, 4, 8, 0, 136, 7, 5, 97, 114, 114, 97, 121, 5, 1, 1, 0, 5, 65, 3, 2, 65, 2, 2, 5, 0, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 48, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 49, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 50, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 51, 119, 17, 97, 102, 116, 101, 114, 45, 114, 101, 99, 111, 110, 110, 101, 99, 116, 45, 52, 5, 0, 119, 1, 65, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 48, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 49, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 50, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 51, 119, 9, 111, 102, 102, 108, 105, 110, 101, 45, 52, 0]
+
+    assert :binary.bin_to_list(update10) == [
+             0,
+             0,
+             5,
+             2,
+             65,
+             4,
+             66,
+             2,
+             5,
+             3,
+             3,
+             74,
+             3,
+             1,
+             0,
+             5,
+             136,
+             4,
+             8,
+             0,
+             136,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             5,
+             65,
+             3,
+             2,
+             65,
+             2,
+             2,
+             5,
+             0,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             48,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             49,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             50,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             51,
+             119,
+             17,
+             97,
+             102,
+             116,
+             101,
+             114,
+             45,
+             114,
+             101,
+             99,
+             111,
+             110,
+             110,
+             101,
+             99,
+             116,
+             45,
+             52,
+             5,
+             0,
+             119,
+             1,
+             65,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             48,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             49,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             50,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             51,
+             119,
+             9,
+             111,
+             102,
+             102,
+             108,
+             105,
+             110,
+             101,
+             45,
+             52,
+             0
+           ]
+
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update10)}
     end)
@@ -3436,8 +4853,34 @@ defmodule Y.ArrayCRDTTest do
     {:ok, arr0_final} = Doc.get(doc0, "array")
     {:ok, arr1_final} = Doc.get(doc1, "array")
 
-    assert Array.to_list(arr0_final) == ["A", "offline-0", "after-reconnect-0", "offline-1", "after-reconnect-1", "offline-2", "after-reconnect-2", "offline-3", "after-reconnect-3", "offline-4", "after-reconnect-4"]
-    assert Array.to_list(arr1_final) == ["A", "offline-0", "after-reconnect-0", "offline-1", "after-reconnect-1", "offline-2", "after-reconnect-2", "offline-3", "after-reconnect-3", "offline-4", "after-reconnect-4"]
+    assert Array.to_list(arr0_final) == [
+             "A",
+             "offline-0",
+             "after-reconnect-0",
+             "offline-1",
+             "after-reconnect-1",
+             "offline-2",
+             "after-reconnect-2",
+             "offline-3",
+             "after-reconnect-3",
+             "offline-4",
+             "after-reconnect-4"
+           ]
+
+    assert Array.to_list(arr1_final) == [
+             "A",
+             "offline-0",
+             "after-reconnect-0",
+             "offline-1",
+             "after-reconnect-1",
+             "offline-2",
+             "after-reconnect-2",
+             "offline-3",
+             "after-reconnect-3",
+             "offline-4",
+             "after-reconnect-4"
+           ]
+
     assert Array.length(arr0_final) == 11, "All operations applied"
   end
 
