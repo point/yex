@@ -263,7 +263,8 @@ defmodule Y.Item do
           {:invalid, transaction}
 
         nil ->
-          case Type.add_before(type, Type.first(type, item), item) do
+          first = Type.first(type, item)
+          case Type.add_before(type, first, item) do
             {:ok, updated_type} ->
               Transaction.update(transaction, updated_type)
 
@@ -403,12 +404,13 @@ defmodule Y.Item do
           _ -> Type.last(type, item)
         end
 
-      with %Item{} <- start_range,
-           %Item{} <- end_range do
+      with %Item{} <- end_range do
+        range = Type.between(type, start_range.id, end_range.id)
+
         do_find_left_for(
           item,
           nil,
-          Type.between(type, start_range.id, end_range.id),
+          range,
           transaction,
           type,
           [],

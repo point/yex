@@ -66,7 +66,7 @@ defmodule Y.Type.GeneralTree do
 
       def find(%unquote(mod){ft: %EmptyTree{}}, _id, default), do: default
 
-      def find(%unquote(mod){ft: tree}, id, default) do
+      def find(%unquote(mod){ft: tree} = array_tree, id, default) do
         {l, v, _} =
           FingerTree.split(tree, fn %{highest_clocks: clocks} ->
             case Map.fetch(clocks, id.client) do
@@ -78,18 +78,41 @@ defmodule Y.Type.GeneralTree do
         prev = FingerTree.last(l)
 
         cond do
-          v.id.clock == id.clock ->
+          # Check if v matches both client AND clock
+          v != nil && v.id.client == id.client && v.id.clock == id.clock ->
             v
 
-          id.clock > v.id.clock && id.clock <= v.id.clock + Item.content_length(v) ->
+          # Check if id is within v's range (same client)
+          v != nil && v.id.client == id.client &&
+              id.clock > v.id.clock && id.clock <= v.id.clock + Item.content_length(v) - 1 ->
             v
 
-          prev && id.clock > prev.id.clock &&
-              id.clock <= prev.id.clock + Item.content_length(prev) ->
+          # Check prev (same client)
+          prev != nil && prev.id.client == id.client &&
+              id.clock >= prev.id.clock &&
+              id.clock <= prev.id.clock + Item.content_length(prev) - 1 ->
             prev
 
           :otherwise ->
-            default
+            # Fall back to linear search if the measure-based approach didn't work
+            # This handles cases where items are not in clock order within the tree
+            do_find_linear(array_tree, id, default)
+        end
+      end
+
+      # Linear search through the tree to find an item by ID
+      # Uses first/rest to short-circuit as soon as the item is found
+      defp do_find_linear(%unquote(mod){ft: %EmptyTree{}}, _id, default), do: default
+
+      defp do_find_linear(%unquote(mod){ft: tree} = array_tree, id, default) do
+        item = FingerTree.first(tree)
+
+        if item.id.client == id.client &&
+             id.clock >= item.id.clock &&
+             id.clock <= item.id.clock + Item.content_length(item) - 1 do
+          item
+        else
+          do_find_linear(%{array_tree | ft: FingerTree.rest(tree)}, id, default)
         end
       end
 
@@ -143,7 +166,38 @@ defmodule Y.Type.GeneralTree do
 
           {:ok, %{array_tree | ft: tree}}
         else
-          {:error, "Item not found"}
+          # Fallback to linear search when measure-based split doesn't find the item
+          do_transform_linear(array_tree, starting_item, acc, fun)
+        end
+      end
+
+      # Linear search fallback for transform when items aren't in clock order
+      defp do_transform_linear(%unquote(mod){ft: tree} = array_tree, %Item{} = starting_item, acc, fun) do
+        empty_tree = FingerTree.finger_tree(tree.meter_object)
+        case find_item_linear(tree, starting_item, empty_tree) do
+          {:found, l, v, r} ->
+            new_tree =
+              case do_transform(v, l, r, acc, fun) do
+                {left_tree, nil} -> left_tree
+                {left_tree, right_tree} -> FingerTree.append(left_tree, right_tree)
+              end
+            {:ok, %{array_tree | ft: new_tree}}
+
+          :not_found ->
+            {:error, "Item not found"}
+        end
+      end
+
+      defp find_item_linear(%EmptyTree{}, _target, _left_acc), do: :not_found
+
+      defp find_item_linear(tree, target, left_acc) do
+        item = FingerTree.first(tree)
+        rest = FingerTree.rest(tree)
+
+        if item == target do
+          {:found, left_acc, item, rest}
+        else
+          find_item_linear(rest, target, FingerTree.conj(left_acc, item))
         end
       end
 
@@ -198,8 +252,9 @@ defmodule Y.Type.GeneralTree do
       defp do_between(tree, right, acc) do
         f = FingerTree.first(tree)
 
+        # Stop BEFORE reaching the right boundary (like Y.js: while o !== this.right)
         if f.id == right do
-          [f | acc]
+          acc
         else
           do_between(FingerTree.rest(tree), right, [f | acc])
         end
@@ -229,7 +284,31 @@ defmodule Y.Type.GeneralTree do
                  |> FingerTree.append(r)
            }}
         else
-          {:error, "Item not found"}
+          # Fallback to linear search
+          do_add_after_linear(at, after_item, item)
+        end
+      end
+
+      defp do_add_after_linear(%unquote(mod){ft: tree} = at, %Item{} = after_item, %Item{} = item) do
+        empty_tree = FingerTree.finger_tree(tree.meter_object)
+        case find_item_linear(tree, after_item, empty_tree) do
+          {:found, l, v, r} ->
+            {:ok,
+             %{
+               at
+               | ft:
+                   l
+                   |> FingerTree.conj(v)
+                   |> then(fn tree ->
+                     Enum.reduce(Item.explode(item), tree, fn item, tree ->
+                       FingerTree.conj(tree, item)
+                     end)
+                   end)
+                   |> FingerTree.append(r)
+             }}
+
+          :not_found ->
+            {:error, "Item not found"}
         end
       end
 
@@ -266,11 +345,35 @@ defmodule Y.Type.GeneralTree do
                  |> FingerTree.append(r)
            }}
         else
-          {:error, "Item not found"}
+          # Fallback to linear search
+          do_add_before_linear(at, before_item, item)
         end
       end
 
-      def next(%unquote(mod){ft: tree}, %Item{} = item) do
+      defp do_add_before_linear(%unquote(mod){ft: tree} = at, %Item{} = before_item, %Item{} = item) do
+        empty_tree = FingerTree.finger_tree(tree.meter_object)
+        case find_item_linear(tree, before_item, empty_tree) do
+          {:found, l, v, r} ->
+            {:ok,
+             %{
+               at
+               | ft:
+                   l
+                   |> then(fn tree ->
+                     Enum.reduce(Item.explode(item), tree, fn item, tree ->
+                       FingerTree.conj(tree, item)
+                     end)
+                   end)
+                   |> FingerTree.conj(v)
+                   |> FingerTree.append(r)
+             }}
+
+          :not_found ->
+            {:error, "Item not found"}
+        end
+      end
+
+      def next(%unquote(mod){ft: tree} = array_tree, %Item{} = item) do
         {_, v, r} =
           FingerTree.split(tree, fn %{highest_clocks: clocks} ->
             case Map.fetch(clocks, item.id.client) do
@@ -279,10 +382,28 @@ defmodule Y.Type.GeneralTree do
             end
           end)
 
-        if v == item, do: FingerTree.first(r)
+        if v.id == item.id do
+          FingerTree.first(r)
+        else
+          # Fall back to linear search
+          do_find_next_linear(array_tree, item)
+        end
       end
 
-      def prev(%unquote(mod){ft: tree}, %Item{} = item) do
+      defp do_find_next_linear(%unquote(mod){ft: %EmptyTree{}}, _item), do: nil
+
+      defp do_find_next_linear(%unquote(mod){ft: tree} = array_tree, item) do
+        current = FingerTree.first(tree)
+        rest_tree = %{array_tree | ft: FingerTree.rest(tree)}
+
+        if current.id == item.id do
+          FingerTree.first(FingerTree.rest(tree))
+        else
+          do_find_next_linear(rest_tree, item)
+        end
+      end
+
+      def prev(%unquote(mod){ft: tree} = array_tree, %Item{} = item) do
         {l, v, _} =
           FingerTree.split(tree, fn %{highest_clocks: clocks} ->
             case Map.fetch(clocks, item.id.client) do
@@ -291,7 +412,25 @@ defmodule Y.Type.GeneralTree do
             end
           end)
 
-        if v == item, do: FingerTree.last(l)
+        if v.id == item.id do
+          FingerTree.last(l)
+        else
+          # Fall back to linear search
+          do_find_prev_linear(array_tree, item, nil)
+        end
+      end
+
+      defp do_find_prev_linear(%unquote(mod){ft: %EmptyTree{}}, _item, prev_item), do: prev_item
+
+      defp do_find_prev_linear(%unquote(mod){ft: tree} = array_tree, item, prev_item) do
+        current = FingerTree.first(tree)
+        rest_tree = %{array_tree | ft: FingerTree.rest(tree)}
+
+        if current.id == item.id do
+          prev_item
+        else
+          do_find_prev_linear(rest_tree, item, current)
+        end
       end
 
       def first(%unquote(mod){ft: tree}), do: FingerTree.first(tree)

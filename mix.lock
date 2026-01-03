@@ -1,5 +1,5 @@
 %{
-  "finger_tree": {:git, "https://github.com/point/finger_tree.git", "381a9188fbacfeb637e43d0ae74a86c1b2f2761a", [branch: "partial_order"]},
+  "finger_tree": {:git, "https://github.com/point/finger_tree.git", "3fbc0d115dc64a76851f478b1eeacd77e65245cb", [branch: "main"]},
   "jason": {:hex, :jason, "1.4.1", "af1504e35f629ddcdd6addb3513c3853991f694921b1b9368b0bd32beb9f1b63", [:mix], [{:decimal, "~> 1.0 or ~> 2.0", [hex: :decimal, repo: "hexpm", optional: true]}], "hexpm", "fbb01ecdfd565b56261302f7e1fcc27c4fb8f32d56eab74db621fc154604a7a1"},
   "uuid": {:hex, :uuid, "1.1.8", "e22fc04499de0de3ed1116b770c7737779f226ceefa0badb3592e64d5cfb4eb9", [:mix], [], "hexpm", "c790593b4c3b601f5dc2378baae7efaf5b3d73c4c6456ba85759905be792f2ac"},
 }

@@ -251,7 +251,7 @@ defmodule Y.Doc do
     |> Enum.filter(fn type -> Type.highest_clock_with_length(type) >= id.clock end)
     |> Enum.find(fn type ->
       type
-      |> Type.to_list(as_items: true)
+      |> Type.to_list(as_items: true, with_deleted: true)
       |> Enum.find(fn %{id: item_id} -> item_id == id end)
     end)
   end

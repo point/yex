@@ -149,10 +149,11 @@ defmodule Y.Type.Array.ArrayTree do
             ),
           len: meter1.len + meter2.len
         }
-      end,
-      fn %Item{id: id1}, %Item{id: id2} ->
-        Kernel.<=({id1.client, id1.clock}, {id2.client, id2.clock})
       end
+      # ,
+      # fn %Item{id: id1}, %Item{id: id2} ->
+      #   Kernel.<=({id1.client, id1.clock}, {id2.client, id2.clock})
+      # end
     )
   end
 
