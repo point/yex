@@ -301,9 +301,8 @@ defmodule Y.Decoder do
   end
 
   # read content type
-  # These are nested types (content of items), NOT top-level types.
-  # They should NOT be added to doc.share - they exist only as item content.
-  # The association with a named type happens through the parent item's parent_name.
+  # These are nested types (content of items). They get a UUID name and need to be
+  # added to doc.share so their child items can find them during integration.
   defp read_content(7, state, %Transaction{doc: doc} = transaction) do
     {type_num, state} = State.read_type_ref(state)
 
@@ -314,7 +313,11 @@ defmodule Y.Decoder do
         _ -> raise("Reading this type of content is not implemented")
       end
 
-    {[type], state, transaction}
+    # Add to doc.share so child items can find their parent during integration
+    new_doc = %{doc | share: Map.put_new(doc.share, type.name, type)}
+    new_transaction = %{transaction | doc: new_doc}
+
+    {[type], state, new_transaction}
   end
 
   # read content any

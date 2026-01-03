@@ -299,13 +299,13 @@ defmodule Y.TextTest do
                },
                %Y.Item{
                  id: %Y.ID{clock: 1},
-                 length: 0,
+                 length: 1,
                  content: ["a"],
                  deleted?: true
                },
                %Y.Item{
                  id: %Y.ID{clock: 2},
-                 length: 0,
+                 length: 1,
                  content: ["b"],
                  deleted?: true
                },
@@ -337,7 +337,7 @@ defmodule Y.TextTest do
                  content: ["a"],
                  deleted?: true,
                  id: %Y.ID{clock: 4},
-                 length: 0,
+                 length: 1,
                  keep?: true,
                  origin: nil,
                  right_origin: nil
@@ -355,7 +355,7 @@ defmodule Y.TextTest do
                  content: ["b"],
                  deleted?: true,
                  id: %Y.ID{clock: 6},
-                 length: 0,
+                 length: 1,
                  keep?: true,
                  origin: %Y.ID{clock: 5},
                  right_origin: nil
@@ -406,7 +406,7 @@ defmodule Y.TextTest do
       {:ok, text_1, transaction} = Text.delete_by_id(text, transaction, format_begin.id)
       assert [
                %Y.Item{
-                 id: %Y.ID{client: 2180, clock: 0},
+                 id: %Y.ID{clock: 0},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: true}],
                  origin: nil,
@@ -417,7 +417,7 @@ defmodule Y.TextTest do
                  keep?: true
                },
                %Y.Item{
-                 length: 0,
+                 length: 1,
                  content: ["a"],
                  deleted?: true,
                },
@@ -428,7 +428,7 @@ defmodule Y.TextTest do
                  deleted?: false,
                },
                %Y.Item{
-                 id: %Y.ID{client: 2180, clock: 4},
+                 id: %Y.ID{clock: 4},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: nil}],
                  deleted?: false,
@@ -439,13 +439,13 @@ defmodule Y.TextTest do
 
       assert [
                %Y.Item{
-                 id: %Y.ID{client: 2180, clock: 0},
+                 id: %Y.ID{clock: 0},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: true}],
                  deleted?: false,
                },
                %Y.Item{
-                 length: 0,
+                 length: 1,
                  content: ["a"],
                  deleted?: true,
                },
@@ -456,7 +456,7 @@ defmodule Y.TextTest do
                  deleted?: false,
                },
                %Y.Item{
-                 id: %Y.ID{client: 2180, clock: 4},
+                 id: %Y.ID{clock: 4},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: nil}],
                  deleted?: false,
@@ -467,7 +467,7 @@ defmodule Y.TextTest do
 
       assert [
                %Y.Item{
-                 id: %Y.ID{client: 2180, clock: 0},
+                 id: %Y.ID{clock: 0},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: true}],
                  deleted?: false,
@@ -478,13 +478,13 @@ defmodule Y.TextTest do
                %Y.Item{
                  content: ["b"],
                  deleted?: true,
-                 length: 0
+                 length: 1
                },
                %Y.Item{
                  deleted?: false,
                },
                %Y.Item{
-                 id: %Y.ID{client: 2180, clock: 4},
+                 id: %Y.ID{clock: 4},
                  length: 1,
                  content: [%Y.Content.Format{key: :bold, value: nil}],
                  deleted?: false,
