@@ -288,13 +288,16 @@ defmodule Y.Decoder do
   end
 
   # read content type
-  defp read_content(7, state, transaction) do
+  # These are nested types (content of items), NOT top-level types.
+  # They should NOT be added to doc.share - they exist only as item content.
+  # The association with a named type happens through the parent item's parent_name.
+  defp read_content(7, state, %Transaction{doc: doc} = transaction) do
     {type_num, state} = State.read_type_ref(state)
 
-    {:ok, type, transaction} =
+    type =
       case type_num do
-        0 -> Doc.get_array(transaction)
-        1 -> Doc.get_map(transaction)
+        0 -> Y.Type.Array.new(doc)
+        1 -> Y.Type.Map.new(doc)
         _ -> raise("Reading this type of content is not implemented")
       end
 

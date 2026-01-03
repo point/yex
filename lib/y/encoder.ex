@@ -314,15 +314,30 @@ defmodule Y.Encoder do
   defp write_parent_info(buf, nil = _origin, %Item{right_origin: nil} = item, %Doc{} = doc) do
     case Doc.get!(doc, item.parent_name) do
       {:ok, parent} ->
-        if parent_item = Doc.find_parent_item!(doc, item) do
-          buf |> write(:parent_info, 0) |> write(:left_id, parent_item.id)
-        else
-          case parent do
-            %ID{} ->
-              buf |> write(:parent_info, 0) |> write(:left_id, parent)
+        # If the parent is a top-level type in doc.share (its name matches item.parent_name),
+        # encode by name so receiving docs can find it in their doc.share.
+        # Only use parent item ID for truly nested types that aren't in doc.share by name.
+        parent_item = Doc.find_parent_item!(doc, item)
 
-            _ ->
-              buf |> write(:parent_info, 1) |> write(:string, parent.name)
+        use_parent_name =
+          case parent do
+            %ID{} -> false
+            _ -> parent.name == item.parent_name
+          end
+
+        if use_parent_name do
+          buf |> write(:parent_info, 1) |> write(:string, parent.name)
+        else
+          if parent_item do
+            buf |> write(:parent_info, 0) |> write(:left_id, parent_item.id)
+          else
+            case parent do
+              %ID{} ->
+                buf |> write(:parent_info, 0) |> write(:left_id, parent)
+
+              _ ->
+                buf |> write(:parent_info, 1) |> write(:string, parent.name)
+            end
           end
         end
         |> then(fn buf ->

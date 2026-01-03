@@ -135,6 +135,12 @@ defmodule Y.Type.Map do
   defdelegate to_list(array), to: Type
   defdelegate to_list(array, opts), to: Type
 
+  def to_map(%Y.Type.Map{} = map_type) do
+    map_type
+    |> to_list()
+    |> Enum.into(%{})
+  end
+
   defimpl Type do
     def highest_clock(%Y.Type.Map{map: map}, client_id) do
       map
