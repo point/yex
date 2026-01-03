@@ -17,9 +17,16 @@ defmodule Y.Encoder.ClientOrLengthBuffer do
 
   def flush(%ClientOrLengthBuffer{s: s, count: count, buffer: buffer} = b) when count > 0 do
     buf =
-      buffer
-      |> write_int(if count == 1, do: s, else: -s)
-      |> then(fn buf -> if count > 1, do: write_uint(buf, count - 2), else: buf end)
+      if count == 1 do
+        # Single value: write as positive
+        write_int(buffer, s)
+      else
+        # Multiple values: write as negative (with sign bit set) + count
+        # Use write_int_with_sign to handle s == 0 case (negative zero)
+        buffer
+        |> write_int_with_sign(s, true)
+        |> write_uint(count - 2)
+      end
 
     %{b | buffer: buf}
   end

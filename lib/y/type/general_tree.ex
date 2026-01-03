@@ -245,7 +245,10 @@ defmodule Y.Type.GeneralTree do
       def add_before(%unquote(mod){ft: tree} = at, %Item{} = before_item, %Item{} = item) do
         {l, v, r} =
           FingerTree.split(tree, fn %{highest_clocks: clocks} ->
-            Map.fetch!(clocks, before_item.id.client) >= before_item.id.clock
+            case Map.fetch(clocks, before_item.id.client) do
+              {:ok, c} -> c >= before_item.id.clock
+              _ -> false
+            end
           end)
 
         if v == before_item do
@@ -282,7 +285,10 @@ defmodule Y.Type.GeneralTree do
       def prev(%unquote(mod){ft: tree}, %Item{} = item) do
         {l, v, _} =
           FingerTree.split(tree, fn %{highest_clocks: clocks} ->
-            Map.fetch!(clocks, item.id.client) >= item.id.clock
+            case Map.fetch(clocks, item.id.client) do
+              {:ok, c} -> c >= item.id.clock
+              _ -> false
+            end
           end)
 
         if v == item, do: FingerTree.last(l)

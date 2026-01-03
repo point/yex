@@ -81,14 +81,15 @@ defmodule Y.Decoder.State do
   def read_client(%State{client: %{count: count, s: s, buf: buf}} = state) do
     {c, s, buf} =
       if count == 0 do
-        {s, buf} = read_int(buf)
+        # Use read_int_with_sign to detect negative zero (RLE-encoded 0)
+        {s, is_negative?, buf} = read_int_with_sign(buf)
 
-        {s, {c, buf}} =
-          if s < 0 do
+        {c, buf} =
+          if is_negative? do
             {c, buf} = read_uint(buf)
-            {-s, {c + 2, buf}}
+            {c + 2, buf}
           else
-            {s, {1, buf}}
+            {1, buf}
           end
 
         {c, s, buf}
@@ -102,14 +103,15 @@ defmodule Y.Decoder.State do
   def read_type_ref(%State{type_ref: %{count: count, s: s, buf: buf}} = state) do
     {c, s, buf} =
       if count == 0 do
-        {s, buf} = read_int(buf)
+        # Use read_int_with_sign to detect negative zero (RLE-encoded 0)
+        {s, is_negative?, buf} = read_int_with_sign(buf)
 
-        {s, {c, buf}} =
-          if s < 0 do
+        {c, buf} =
+          if is_negative? do
             {c, buf} = read_uint(buf)
-            {-s, {c + 2, buf}}
+            {c + 2, buf}
           else
-            {s, {1, buf}}
+            {1, buf}
           end
 
         {c, s, buf}
@@ -144,11 +146,12 @@ defmodule Y.Decoder.State do
   def read_len(%State{length: %{count: c, s: s, buf: buf}} = state) do
     {c, s, buf} =
       if c == 0 do
-        {s, buf} = read_int(buf)
+        # Use read_int_with_sign to detect negative zero (RLE-encoded 0)
+        {s, is_negative?, buf} = read_int_with_sign(buf)
 
-        if s < 0 do
+        if is_negative? do
           {c, buf} = read_uint(buf)
-          {c + 2, -s, buf}
+          {c + 2, s, buf}
         else
           {1, s, buf}
         end
@@ -218,11 +221,12 @@ defmodule Y.Decoder.State do
   def read_string(%State{string: string, string_lengths: %{count: c, s: s, buf: buf}} = state) do
     {c, s, buf} =
       if c == 0 do
-        {s, buf} = read_int(buf)
+        # Use read_int_with_sign to detect negative zero (RLE-encoded 0)
+        {s, is_negative?, buf} = read_int_with_sign(buf)
 
-        if s < 0 do
+        if is_negative? do
           {c, buf} = read_uint(buf)
-          {c + 2, -s, buf}
+          {c + 2, s, buf}
         else
           {1, s, buf}
         end

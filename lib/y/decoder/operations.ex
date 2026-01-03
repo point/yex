@@ -25,6 +25,24 @@ defmodule Y.Decoder.Operations do
     end
   end
 
+  @doc """
+  Read a signed integer and return both the absolute value and whether the sign bit was set.
+  This is needed for RLE decoding where we need to distinguish between +0 and -0.
+  Returns {value, is_negative?, rest}
+  """
+  def read_int_with_sign(<<r::size(8), rest::binary>>) do
+    num = r &&& 63
+    mult = 64
+    is_negative? = (r &&& 64) > 0
+
+    if (r &&& 128) == 0 do
+      {num, is_negative?, rest}
+    else
+      {num, rest} = do_read_uint(rest, num, mult)
+      {num, is_negative?, rest}
+    end
+  end
+
   def read_raw_string(<<r::size(8), rest::binary>>) do
     <<s::binary-size(^r), rest::binary>> = rest
     {s, rest}

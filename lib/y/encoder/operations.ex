@@ -18,6 +18,18 @@ defmodule Y.Encoder.Operations do
     acc |> do_write_int(floor(num / 64))
   end
 
+  @doc """
+  Write a signed integer with explicit sign flag.
+  This is needed to encode "negative zero" for RLE encoding of 0 values.
+  """
+  def write_int_with_sign(acc \\ <<>>, num, is_negative?) do
+    neg? = if is_negative?, do: 64, else: 0
+    cont? = if num > 63, do: 128, else: 0
+    acc = acc <> <<cont? ||| neg? ||| (63 &&& num)>>
+
+    acc |> do_write_int(floor(num / 64))
+  end
+
   def write_bigint(acc \\ <<>>, num), do: acc <> <<num::size(64)>>
 
   def write_float64(acc \\ <<>>, num), do: acc <> <<num::float-size(64)>>
