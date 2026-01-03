@@ -23,7 +23,7 @@ defmodule Yex.MixProject do
     [
       {:uuid, "~> 1.1"},
       {:jason, "~> 1.4"},
-      {:finger_tree, git: "https://github.com/point/finger_tree.git", branch: "main"}
+      {:finger_tree, git: "https://github.com/point/finger_tree.git", branch: "partial_order"}
     ]
   end
 end

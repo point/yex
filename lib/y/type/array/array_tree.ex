@@ -113,14 +113,24 @@ defmodule Y.Type.Array.ArrayTree do
 
   defp meter_object do
     FingerTree.MeterObject.new(
-      fn %Item{id: id} = item ->
-        len = item.length
+      fn
+        %Item{id: id, deleted?: true} = item ->
+          len = item.length
 
-        %Meter{
-          highest_clocks: %{id.client => id.clock},
-          highest_clocks_with_length: %{id.client => id.clock + len},
-          len: len
-        }
+          %Meter{
+            highest_clocks: %{id.client => id.clock},
+            highest_clocks_with_length: %{id.client => id.clock + len},
+            len: 0
+          }
+
+        %Item{id: id} = item ->
+          len = item.length
+
+          %Meter{
+            highest_clocks: %{id.client => id.clock},
+            highest_clocks_with_length: %{id.client => id.clock + len},
+            len: len
+          }
       end,
       %Meter{highest_clocks: %{}, highest_clocks_with_length: %{}, len: 0},
       fn %Meter{} = meter1, %Meter{} = meter2 ->
@@ -139,6 +149,9 @@ defmodule Y.Type.Array.ArrayTree do
             ),
           len: meter1.len + meter2.len
         }
+      end,
+      fn %Item{id: id1}, %Item{id: id2} ->
+        Kernel.<=({id1.client, id1.clock}, {id2.client, id2.clock})
       end
     )
   end

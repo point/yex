@@ -1024,30 +1024,69 @@ defmodule Y.ArrayCRDTTest do
   Test concurrent deletes of same element.
   """
   test "concurrent deletes same element" do
-    {:ok, doc0} = Doc.new(name: :cd_same_0, client_id: 0)
-    {:ok, doc1} = Doc.new(name: :cd_same_1, client_id: 1)
-    {:ok, doc2} = Doc.new(name: :cd_same_2, client_id: 2)
+    # Use explicit client IDs to match Y.JS test (clients 1, 2, 3)
+    {:ok, doc0} = Doc.new(name: :cd_same_0, client_id: 1)
+    {:ok, doc1} = Doc.new(name: :cd_same_1, client_id: 2)
+    {:ok, doc2} = Doc.new(name: :cd_same_2, client_id: 3)
 
     {:ok, arr0} = Doc.get_array(doc0, "array")
     {:ok, _arr1} = Doc.get_array(doc1, "array")
     {:ok, _arr2} = Doc.get_array(doc2, "array")
 
-    # Setup initial state
+    # Setup initial state - insert A, B, C
     Doc.transact!(doc0, fn transaction ->
       {:ok, _arr, transaction} = Array.put_many(arr0, transaction, 0, ["A", "B", "C"])
       {:ok, transaction}
     end)
 
     # Sync initial state
-    initial_update = Encoder.encode(doc0)
+    update0_initial = Encoder.encode(doc0)
 
     Doc.transact!(doc1, fn transaction ->
-      {:ok, Doc.apply_update(transaction, initial_update)}
+      {:ok, Doc.apply_update(transaction, update0_initial)}
     end)
 
     Doc.transact!(doc2, fn transaction ->
-      {:ok, Doc.apply_update(transaction, initial_update)}
+      {:ok, Doc.apply_update(transaction, update0_initial)}
     end)
+
+    # Binary assertion for initial update
+    assert :binary.bin_to_list(update0_initial) == [
+             0,
+             0,
+             1,
+             1,
+             0,
+             0,
+             1,
+             8,
+             7,
+             5,
+             97,
+             114,
+             114,
+             97,
+             121,
+             5,
+             1,
+             1,
+             0,
+             1,
+             3,
+             1,
+             1,
+             0,
+             119,
+             1,
+             65,
+             119,
+             1,
+             66,
+             119,
+             1,
+             67,
+             0
+           ]
 
     # All users try to delete 'B' (index 1) concurrently
     Doc.transact!(doc0, fn transaction ->
@@ -1072,6 +1111,57 @@ defmodule Y.ArrayCRDTTest do
     update0 = Encoder.encode(doc0)
     update1 = Encoder.encode(doc1)
     update2 = Encoder.encode(doc2)
+
+    # Binary assertions - all updates are identical since they contain same base data with same delete
+    expected_update_after_delete = [
+      0,
+      0,
+      2,
+      65,
+      1,
+      2,
+      0,
+      2,
+      0,
+      5,
+      8,
+      0,
+      129,
+      0,
+      136,
+      7,
+      5,
+      97,
+      114,
+      114,
+      97,
+      121,
+      5,
+      1,
+      1,
+      0,
+      2,
+      65,
+      1,
+      1,
+      3,
+      0,
+      119,
+      1,
+      65,
+      119,
+      1,
+      67,
+      1,
+      1,
+      1,
+      1,
+      0
+    ]
+
+    assert :binary.bin_to_list(update0) == expected_update_after_delete
+    assert :binary.bin_to_list(update1) == expected_update_after_delete
+    assert :binary.bin_to_list(update2) == expected_update_after_delete
 
     Doc.transact!(doc0, fn transaction ->
       {:ok, Doc.apply_update(transaction, update1)}

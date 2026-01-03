@@ -106,8 +106,8 @@ defmodule Y.Type.Array do
            Transaction.update(transaction, %Array{array | tree: new_array_tree}) do
       {:ok, %{array | tree: new_array_tree}, transaction}
     else
-      _ ->
-        Logger.warning("Fail to delete item(s)",
+      {:error, msg} ->
+        Logger.warning("Fail to delete item(s): #{msg}",
           array: array,
           starting_item: starting_item,
           length: length

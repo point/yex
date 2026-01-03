@@ -97,7 +97,10 @@ defmodule Y.Type.GeneralTree do
           when is_list(with_items) do
         {l, v, r} =
           FingerTree.split(tree, fn %{highest_clocks: clocks} ->
-            Map.fetch!(clocks, item.id.client) >= item.id.clock
+            case Map.fetch(clocks, item.id.client) do
+              {:ok, c} -> c >= item.id.clock
+              _ -> false
+            end
           end)
 
         if v == item do
