@@ -417,15 +417,25 @@ defmodule Y.Item do
             range
           end
 
-        do_find_left_for(
-          item,
-          nil,
-          range,
-          transaction,
-          type,
-          [],
-          []
-        )
+        result =
+          do_find_left_for(
+            item,
+            nil,
+            range,
+            transaction,
+            type,
+            [],
+            []
+          )
+
+        # If do_find_left_for returns nil but item_left exists, the item should
+        # be inserted after item_left (its origin), not at the beginning.
+        # This matches Y.js behavior where `left` starts as item.left and is only
+        # updated when a conflicting item takes precedence.
+        case result do
+          nil -> item_left
+          found -> found
+        end
       end
     else
       item_left

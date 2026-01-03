@@ -22,7 +22,8 @@ defmodule Y.Decoder do
       :retry_count,
       :failed_to_integrate,
       :missing_sv,
-      :unapplied_delete_sets
+      :unapplied_delete_sets,
+      retry_pass: false
     ]
   end
 
@@ -146,34 +147,46 @@ defmodule Y.Decoder do
 
   defp do_integrate([], [], internal_state), do: internal_state
 
+  # After retry pass - check what items still failed
   defp do_integrate(
          [],
-         items_to_retry,
-         %{transaction: transaction, failed_to_integrate: failed_to_integrate} = internal_state
+         items_failed_again,
+         %{retry_pass: true, transaction: transaction, failed_to_integrate: failed_to_integrate} =
+           internal_state
        ) do
-    # detect if there're duplicate elements in `items_to_retry`
-    # duplication means we tried to `integrate` element at least twice,
-    # so we exclude it from the retry list
-    items_to_retry
-    |> Enum.frequencies()
-    |> Enum.reduce([], fn
-      {item, 1}, acc -> [item | acc]
-      {_item, _}, acc -> acc
-    end)
-    |> case do
+    case items_failed_again do
       [] ->
-        Logger.warning("Failed to integrate items. Tried > 1 times. Leaving unintegrated",
-          items_to_retry: items_to_retry
+        %{internal_state | retry_pass: false}
+
+      failed ->
+        Logger.warning("Failed to integrate items after retry. Leaving unintegrated",
+          items_to_retry: failed
         )
 
         %{
           internal_state
           | transaction: transaction,
-            failed_to_integrate: failed_to_integrate ++ items_to_retry
+            failed_to_integrate: failed_to_integrate ++ failed,
+            retry_pass: false
         }
+    end
+  end
 
-      items_to_retry_with_retry_count_less_2 ->
-        do_integrate(items_to_retry_with_retry_count_less_2, items_to_retry, internal_state)
+  # First pass completed with failed items - retry them once
+  defp do_integrate([], items_to_retry, internal_state) do
+    # items_to_retry contains items that failed during the current pass.
+    # We should retry them once more, and if they still fail, give up.
+    # Use a fresh empty accumulator for the retry pass - any item that fails
+    # during retry will be added to that accumulator, and we can detect it.
+
+    case items_to_retry do
+      [] ->
+        internal_state
+
+      items ->
+        # Try integrating these items one more time with a fresh accumulator
+        # If they fail again, they'll be added to the new accumulator
+        do_integrate(items, [], %{internal_state | retry_pass: true})
     end
   end
 
