@@ -265,7 +265,8 @@ defmodule Y.ArrayTest do
              |> Doc.get("array")
 
     [%{id: %{client: client}} | _] = Array.to_list(array, as_items: true)
-    items = Array.between(array, ID.new(client, 3), ID.new(client, 6))
+    # between excludes the right boundary (like Y.js), so between(3, 7) returns items 3, 4, 5, 6
+    items = Array.between(array, ID.new(client, 3), ID.new(client, 7))
 
     assert Enum.map(items, fn %{id: %{clock: c}} -> c end) |> Enum.sort() ==
              Enum.to_list(3..6)
