@@ -75,13 +75,12 @@ defmodule Y.Decoder do
 
   defp finalize_or_retry(%{retry?: true, retry_count: retry_count} = internal_state)
        when retry_count < 5 do
-    transaction = internal_state.transaction
-    doc = transaction.doc
+    %Transaction{doc: %Doc{} = doc} = transaction = internal_state.transaction
     pending_structs = doc.pending_structs.structs
 
     %{
       internal_state
-      | transaction: %Transaction{transaction | doc: %{doc | pending_structs: nil}},
+      | transaction: %{transaction | doc: %{doc | pending_structs: nil}},
         decoder_state: nil,
         client_refs: %{},
         failed_to_integrate: [],
@@ -652,7 +651,7 @@ defmodule Y.Decoder do
     [p1 | _] = list2
 
     cond do
-      d1.id.client == p1.id.client == 0 ->
+      d1.id.client == p1.id.client ->
         cond do
           d1.id.clock - p1.id.clock == 0 && d1.__struct__ == p1.__struct__ -> {list1, list2}
           d1.id.clock - p1.id.clock == 0 && match?(%Skip{}, d1) -> {list2, list1}

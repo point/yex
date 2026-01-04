@@ -97,13 +97,13 @@ defmodule Y.Type.Array do
     end
   end
 
-  defp do_delete(array, transaction, starting_item, length) do
+  defp do_delete(%Array{} = array, transaction, starting_item, length) do
     with {:ok, new_array_tree} <-
            ArrayTree.transform(array.tree, starting_item, 0, fn item, pos ->
              if pos < length, do: {Item.delete(item), pos + 1}
            end),
          {:ok, transaction} <-
-           Transaction.update(transaction, %Array{array | tree: new_array_tree}) do
+           Transaction.update(transaction, %{array | tree: new_array_tree}) do
       {:ok, %{array | tree: new_array_tree}, transaction}
     else
       {:error, msg} ->

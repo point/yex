@@ -5,7 +5,7 @@ defmodule Yex.MixProject do
     [
       app: :yex,
       version: "0.1.0",
-      elixir: "~> 1.15",
+      elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       deps: deps()
     ]
@@ -23,6 +23,7 @@ defmodule Yex.MixProject do
     [
       {:uuid, "~> 1.1"},
       {:jason, "~> 1.4"},
+      {:decimal, "~> 2.0"},
       {:finger_tree, git: "https://github.com/point/finger_tree.git", branch: "main"}
     ]
   end

@@ -802,6 +802,7 @@ defmodule Y.ArrayCRDTTest do
     Doc.transact!(doc1, fn transaction ->
       {:ok, Doc.apply_update(transaction, initial_update)}
     end)
+
     Doc.transact!(doc2, fn transaction ->
       {:ok, Doc.apply_update(transaction, initial_update)}
     end)
@@ -835,10 +836,10 @@ defmodule Y.ArrayCRDTTest do
 
     # Sync all updates to all docs
     for {doc, updates} <- [
-      {doc0, [update1, update2]},
-      {doc1, [update0, update2]},
-      {doc2, [update0, update1]}
-    ] do
+          {doc0, [update1, update2]},
+          {doc1, [update0, update2]},
+          {doc2, [update0, update1]}
+        ] do
       Enum.each(updates, fn update ->
         Doc.transact!(doc, fn transaction ->
           {:ok, Doc.apply_update(transaction, update)}

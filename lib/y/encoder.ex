@@ -282,6 +282,30 @@ defmodule Y.Encoder do
     end)
   end
 
+  # For pending structs where we don't have a Doc context
+  defp write_item(buf, %Item{id: id} = item, nil = _doc, offset, offset_end) do
+    origin =
+      if offset > 0,
+        do: ID.new(id.client, id.clock + offset - 1),
+        else: item.origin
+
+    origin_info = if origin == nil, do: 0, else: 128
+    content_ref = Item.content_ref(item) &&& 31
+    right_origin_info = if item.right_origin == nil, do: 0, else: 64
+    parent_sub = if item.parent_sub == nil, do: 0, else: 32
+
+    buf
+    |> write(:info, content_ref ||| origin_info ||| right_origin_info ||| parent_sub)
+    |> then(fn buf ->
+      if origin, do: buf |> write(:left_id, origin), else: buf
+    end)
+    |> then(fn buf ->
+      if item.right_origin, do: buf |> write(:right_id, item.right_origin), else: buf
+    end)
+    |> write_parent_info(origin, item, nil)
+    |> write_content(item, offset, offset_end)
+  end
+
   defp write_item(buf, %Item{id: id} = item, %Doc{} = doc, offset, offset_end) do
     # When offset > 0, we're encoding a partial item starting from an offset.
     # The origin should point to the previous element in the content.
@@ -350,6 +374,20 @@ defmodule Y.Encoder do
       _ ->
         buf
     end
+  end
+
+  # For pending structs with nil doc, write parent by name if origin/right_origin are nil
+  defp write_parent_info(buf, nil = _origin, %Item{right_origin: nil} = item, nil = _doc) do
+    buf
+    |> write(:parent_info, 1)
+    |> write(:string, item.parent_name)
+    |> then(fn buf ->
+      if item.parent_sub do
+        buf |> write(:string, item.parent_sub)
+      else
+        buf
+      end
+    end)
   end
 
   defp write_parent_info(buf, _origin, _item, _doc), do: buf

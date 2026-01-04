@@ -144,14 +144,14 @@ defmodule Y.Doc do
 
   def get!(%Doc{}, name), do: {:error, "Type #{name} does not exist"}
 
-  def get_or_create_unknown(%Transaction{doc: doc} = transaction, name) do
+  def get_or_create_unknown(%Transaction{doc: %Doc{} = doc} = transaction, name) do
     case get(transaction, name) do
       {:ok, type} ->
         {:ok, type, transaction}
 
       {:error, _} ->
         type = Unknown.new(doc, name)
-        {:ok, type, %{transaction | doc: %Doc{doc | share: Map.put_new(doc.share, name, type)}}}
+        {:ok, type, %{transaction | doc: %{doc | share: Map.put_new(doc.share, name, type)}}}
     end
   end
 
