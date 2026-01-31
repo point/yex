@@ -407,6 +407,15 @@ defmodule Y.Encoder do
 
   defp write_any_content(buf, c) do
     cond do
+      # ContentString - write string to string encoder
+      match?(%Y.Content.String{}, c) ->
+        buf |> write(:string, c.str)
+
+      # ContentFormat - write key to key encoder and value to rest as JSON/any
+      match?(%Y.Content.Format{}, c) ->
+        key_str = if is_atom(c.key), do: Atom.to_string(c.key), else: c.key
+        buf |> write(:key, key_str) |> write_any_content(c.value)
+
       is_bitstring(c) && String.valid?(c) ->
         buf |> write(:rest, <<119>>) |> write(:rest, write_string(c))
 
@@ -440,7 +449,14 @@ defmodule Y.Encoder do
         buf
 
       is_struct(c) && Type.impl_for(c) != nil ->
-        buf |> write(:type_ref, Type.type_ref(c))
+        buf = buf |> write(:type_ref, Type.type_ref(c))
+        # XmlElement needs to write its node_name after the type_ref
+        case c do
+          %Y.Type.XmlElement{node_name: node_name} ->
+            buf |> write(:string, node_name)
+          _ ->
+            buf
+        end
 
       is_struct(c) || is_map(c) ->
         c = if is_struct(c), do: Map.from_struct(c), else: c

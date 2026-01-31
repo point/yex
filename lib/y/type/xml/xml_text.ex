@@ -1,4 +1,12 @@
-defmodule Y.Type.Text do
+defmodule Y.Type.XmlText do
+  @moduledoc """
+  XML Text type - represents text content within XML elements.
+  Similar to YXmlText in Y.js.
+
+  XmlText wraps the Text type to provide text nodes in XML documents.
+  It supports the same formatting capabilities as Text.
+  """
+
   alias __MODULE__
   alias Y.Doc
   alias Y.Type
@@ -6,7 +14,6 @@ defmodule Y.Type.Text do
   alias Y.Type.Unknown
   alias Y.Content.Format
   alias Y.Content.Deleted
-  alias Y.Content.String, as: ContentString
   alias Y.Item
   alias Y.ID
   alias Y.Transaction
@@ -17,18 +24,23 @@ defmodule Y.Type.Text do
             doc_name: nil,
             name: nil
 
+  @doc """
+  Create a new XmlText.
+  """
   def new(%Doc{name: doc_name}, name \\ UUID.uuid4()) do
-    %Text{doc_name: doc_name, name: name, tree: Tree.new()}
+    %XmlText{doc_name: doc_name, name: name, tree: Tree.new()}
   end
 
+  @doc """
+  Insert text at the given index with optional attributes.
+  """
   def insert(
-        %Text{tree: tree} = type_text,
+        %XmlText{tree: tree} = xml_text,
         %Transaction{} = transaction,
         index,
         text,
         attributes \\ %{}
       ) do
-    # Must get clock for THIS client only, not the max across all clients
     with last_clock = Doc.highest_clock_with_length(transaction, transaction.doc.client_id),
          %Tree{} = new_tree <-
            Tree.insert(
@@ -36,13 +48,35 @@ defmodule Y.Type.Text do
              index,
              text,
              attributes,
-             type_text.name,
+             xml_text.name,
              transaction.doc.client_id,
              last_clock
            ),
-         new_type_text = %{type_text | tree: new_tree},
-         {:ok, new_transaction} <- Transaction.update(transaction, new_type_text) do
-      {:ok, new_type_text, new_transaction}
+         new_xml_text = %{xml_text | tree: new_tree},
+         {:ok, new_transaction} <- Transaction.update(transaction, new_xml_text) do
+      {:ok, new_xml_text, new_transaction}
+    end
+  end
+
+  @doc """
+  Delete text at the given index.
+  """
+  def delete(xml_text, transaction, index, length \\ 1)
+  def delete(_xml_text, transaction, _index, 0), do: {:ok, transaction}
+
+  def delete(%XmlText{} = xml_text, %Transaction{} = transaction, index, length) do
+    with new_xml_text = %{xml_text | tree: Tree.delete(xml_text.tree, index, length)},
+         {:ok, transaction} <- Transaction.update(transaction, new_xml_text) do
+      {:ok, new_xml_text, transaction}
+    else
+      _ ->
+        Logger.warning("Fail to delete item(s)",
+          xml_text: xml_text,
+          index: index,
+          length: length
+        )
+
+        {:error, xml_text, transaction}
     end
   end
 
@@ -50,17 +84,17 @@ defmodule Y.Type.Text do
   Format a range of text with the given attributes.
 
   ## Parameters
-  - text: The Text type
+  - xml_text: The XmlText type
   - transaction: The current transaction
   - index: The starting index of the range to format
   - length: The length of the range to format
   - attributes: A map of attributes to apply (e.g., %{bold: true, italic: true})
 
   ## Returns
-  `{:ok, new_text, new_transaction}` on success
+  `{:ok, new_xml_text, new_transaction}` on success
   """
   def format(
-        %Text{tree: tree} = type_text,
+        %XmlText{tree: tree} = xml_text,
         %Transaction{} = transaction,
         index,
         length,
@@ -74,54 +108,41 @@ defmodule Y.Type.Text do
              index,
              length,
              attributes,
-             type_text.name,
+             xml_text.name,
              transaction.doc.client_id,
              last_clock
            ),
-         new_type_text = %{type_text | tree: new_tree},
-         {:ok, new_transaction} <- Transaction.update(transaction, new_type_text) do
-      {:ok, new_type_text, new_transaction}
+         new_xml_text = %{xml_text | tree: new_tree},
+         {:ok, new_transaction} <- Transaction.update(transaction, new_xml_text) do
+      {:ok, new_xml_text, new_transaction}
     end
   end
 
-  def format(%Text{} = text, %Transaction{} = transaction, _index, 0, _attributes) do
-    {:ok, text, transaction}
+  def format(%XmlText{} = xml_text, %Transaction{} = transaction, _index, 0, _attributes) do
+    {:ok, xml_text, transaction}
   end
 
-  def delete(text, transaction, index, length \\ 1)
-  def delete(_text, transaction, _index, 0), do: {:ok, transaction}
-
-  def delete(%Text{} = text, %Transaction{} = transaction, index, length) do
-    with new_text = %{text | tree: Tree.delete(text.tree, index, length)},
-         {:ok, transaction} <- Transaction.update(transaction, new_text) do
-      {:ok, new_text, transaction}
-    else
-      _ ->
-        Logger.warning("Fail to delete item(s)",
-          text: text,
-          index: index,
-          length: length
-        )
-
-        {:error, text, transaction}
-    end
-  end
-
-  def delete_by_id(%Text{tree: tree} = text, %Transaction{} = transaction, %ID{} = id) do
+  @doc """
+  Delete text by item ID.
+  """
+  def delete_by_id(%XmlText{tree: tree} = xml_text, %Transaction{} = transaction, %ID{} = id) do
     case Tree.find_index(tree, id) do
-      nil -> {:error, text, transaction}
-      idx -> Text.delete(text, transaction, idx)
+      nil -> {:error, xml_text, transaction}
+      idx -> XmlText.delete(xml_text, transaction, idx)
     end
   end
 
-  def to_string(%Text{} = text) do
-    to_list(text)
+  @doc """
+  Convert to plain string (without formatting).
+  """
+  def to_string(%XmlText{} = xml_text) do
+    to_list(xml_text)
     |> Enum.reject(&match?(%Format{}, &1))
     |> Enum.join()
   end
 
   @doc """
-  Convert the text to a delta format (list of operations with attributes).
+  Convert the xml text to a delta format (list of operations with attributes).
 
   Returns a list of maps, each with:
   - `:insert` - the text content
@@ -135,8 +156,8 @@ defmodule Y.Type.Text do
   ]
   ```
   """
-  def to_delta(%Text{} = text) do
-    items = to_list(text, as_items: true)
+  def to_delta(%XmlText{} = xml_text) do
+    items = to_list(xml_text, as_items: true)
 
     # Track current attributes as we iterate
     {result, final_attrs, final_pending_text} =
@@ -198,6 +219,9 @@ defmodule Y.Type.Text do
     end
   end
 
+  @doc """
+  Convert from Unknown type (used during decoding).
+  """
   def from_unknown(%Unknown{} = u) do
     tree =
       u
@@ -206,25 +230,26 @@ defmodule Y.Type.Text do
         Tree.conj!(tree, item)
       end)
 
-    %Text{doc_name: u.doc_name, name: u.name, tree: tree}
+    %XmlText{doc_name: u.doc_name, name: u.name, tree: tree}
   end
 
-  defdelegate to_list(text), to: Type
-  defdelegate to_list(text, opts), to: Type
+  defdelegate to_list(xml_text), to: Type
+  defdelegate to_list(xml_text, opts), to: Type
 
+  # Y.Type protocol implementation
   defimpl Type do
-    def highest_clock(%Text{tree: tree}, client), do: Tree.highest_clock(tree, client)
+    def highest_clock(%XmlText{tree: tree}, client), do: Tree.highest_clock(tree, client)
 
-    def highest_clock_with_length(%Text{tree: tree}, client),
+    def highest_clock_with_length(%XmlText{tree: tree}, client),
       do: Tree.highest_clock_with_length(tree, client)
 
-    def highest_clock_by_client_id(%Text{tree: tree}),
+    def highest_clock_by_client_id(%XmlText{tree: tree}),
       do: Tree.highest_clock_by_client_id(tree)
 
-    def highest_clock_with_length_by_client_id(%Text{tree: tree}),
+    def highest_clock_with_length_by_client_id(%XmlText{tree: tree}),
       do: Tree.highest_clock_with_length_by_client_id(tree)
 
-    def pack(%Text{tree: tree} = text) do
+    def pack(%XmlText{tree: tree} = xml_text) do
       new_tree =
         tree
         |> Enum.reduce([], fn
@@ -239,20 +264,12 @@ defmodule Y.Type.Text do
             end
         end)
         |> Enum.reverse()
-        |> Enum.map(fn %Item{content: content} = item ->
-          if length(content) > 1 &&
-               Enum.all?(content, fn c -> String.valid?(c) && String.length(c) == 1 end) do
-            %{item | content: [ContentString.new(content)]}
-          else
-            item
-          end
-        end)
         |> Enum.into(Tree.new())
 
-      %{text | tree: new_tree}
+      %{xml_text | tree: new_tree}
     end
 
-    def to_list(%Text{tree: tree}, opts \\ []) do
+    def to_list(%XmlText{tree: tree}, opts \\ []) do
       as_items = Keyword.get(opts, :as_items, false)
       with_deleted = Keyword.get(opts, :with_deleted, false)
 
@@ -263,15 +280,18 @@ defmodule Y.Type.Text do
           Tree.to_list(tree) |> Enum.reject(& &1.deleted?)
         end
 
-      if as_items, do: items, else: items |> Enum.map(& &1.content) |> List.flatten()
+      if as_items,
+        do: items,
+        else:
+          items
+          |> Enum.map(fn item -> item.content end)
+          |> List.flatten()
     end
 
-    def find(%Text{tree: tree}, %ID{} = id, default) do
-      tree |> Tree.find(id, default)
-    end
+    def find(%XmlText{tree: tree}, %ID{} = id, default), do: tree |> Tree.find(id, default)
 
     def unsafe_replace(
-          %Text{tree: tree} = text,
+          %XmlText{tree: tree} = xml_text,
           %Item{id: %ID{clock: item_clock}} = item,
           with_items
         )
@@ -290,53 +310,55 @@ defmodule Y.Type.Text do
 
         :otherwise ->
           case Tree.replace(tree, item, with_items) do
-            {:ok, new_tree} -> {:ok, %{text | tree: new_tree}}
+            {:ok, new_tree} -> {:ok, %{xml_text | tree: new_tree}}
             err -> err
           end
       end
     end
 
-    def between(%Text{tree: tree}, %ID{} = left, %ID{} = right) do
+    def between(%XmlText{tree: tree}, %ID{} = left, %ID{} = right) do
       Tree.between(tree, left, right)
     end
 
-    def add_after(%Text{tree: tree} = text, %Item{} = after_item, %Item{} = item) do
+    def add_after(%XmlText{tree: tree} = xml_text, %Item{} = after_item, %Item{} = item) do
       case Tree.add_after(tree, after_item, item) do
-        {:ok, new_tree} -> {:ok, %{text | tree: new_tree}}
+        {:ok, new_tree} -> {:ok, %{xml_text | tree: new_tree}}
         err -> err
       end
     end
 
-    def add_before(%Text{tree: tree} = text, %Item{} = before_item, %Item{} = item) do
+    def add_before(%XmlText{tree: tree} = xml_text, before_item, %Item{} = item) do
       case Tree.add_before(tree, before_item, item) do
-        {:ok, tree} -> {:ok, %{text | tree: tree}}
+        {:ok, tree} -> {:ok, %{xml_text | tree: tree}}
         err -> err
       end
     end
 
-    def next(%Text{tree: tree}, %Item{} = item) do
+    def next(%XmlText{tree: tree}, %Item{} = item) do
       Tree.next(tree, item)
     end
 
-    def prev(%Text{tree: tree}, %Item{} = item) do
+    def prev(%XmlText{tree: tree}, %Item{} = item) do
       Tree.prev(tree, item)
     end
 
-    def first(%Text{tree: tree}, _) do
+    def first(%XmlText{tree: tree}, _) do
       Tree.first(tree)
     end
 
-    def last(%Text{tree: tree}, _) do
+    def last(%XmlText{tree: tree}, _) do
       Tree.last(tree)
     end
 
-    # defdelegate delete(text, transaction, id), to: Y.Type.Array, as: :delete_by_id
+    def delete(%XmlText{} = xml_text, %Transaction{} = transaction, %ID{} = id) do
+      XmlText.delete_by_id(xml_text, transaction, id)
+    end
 
-    def type_ref(_), do: 0
+    def type_ref(_), do: 6
 
-    def gc(%Text{tree: tree} = text) do
+    def gc(%XmlText{tree: tree} = xml_text) do
       new_tree =
-        text
+        xml_text
         |> to_list(as_items: true, with_deleted: true)
         |> Enum.filter(fn
           %Item{content: [%Deleted{}]} -> false
@@ -360,51 +382,7 @@ defmodule Y.Type.Text do
             end)
         end
 
-      %{text | tree: new_tree}
+      %{xml_text | tree: new_tree}
     end
-
-    def delete(%Text{} = text, transaction, id), do: Text.delete_by_id(text, transaction, id)
   end
-
-  # defimpl Enumerable do
-  #   def count(_) do
-  #     {:error, __MODULE__}
-  #   end
-  #
-  #   def member?(_array, _element) do
-  #     {:error, __MODULE__}
-  #   end
-  #
-  #   def reduce(array, acc, fun)
-  #
-  #   def reduce(%Text{tree: tree}, {:cont, acc}, fun) do
-  #     Enumerable.reduce(tree, {:cont, acc}, fn
-  #       nil, acc ->
-  #         {:done, acc}
-  #
-  #       %{deleted?: true}, acc ->
-  #         {:cont, acc}
-  #
-  #       %{content: content}, acc ->
-  #         Enum.reduce_while(content, {:cont, acc}, fn c, {_, acc} ->
-  #           case fun.(c, acc) do
-  #             {:cont, _acc} = r -> {:cont, r}
-  #             {:halt, _acc} = r -> {:halt, r}
-  #           end
-  #         end)
-  #     end)
-  #   end
-  #
-  #   def reduce(_array, {:halt, acc}, _fun) do
-  #     {:halted, acc}
-  #   end
-  #
-  #   def reduce(array, {:suspend, acc}, fun) do
-  #     {:suspended, acc, &reduce(array, &1, fun)}
-  #   end
-  #
-  #   def slice(_) do
-  #     {:error, __MODULE__}
-  #   end
-  # end
 end

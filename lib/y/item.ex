@@ -198,6 +198,8 @@ defmodule Y.Item do
       match?(%Y.Skip{}, content) -> raise "Skip is not ItemContent"
       match?(%Deleted{}, content) -> 1
       match?(%Binary{}, content) -> 3
+      match?(%Y.Content.String{}, content) -> 4
+      match?(%Y.Content.Format{}, content) -> 6
       is_struct(content) && Type.impl_for(content) != nil -> 7
       is_struct(content) -> 9
       :otherwise -> 8

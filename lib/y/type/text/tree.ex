@@ -96,6 +96,219 @@ defmodule Y.Type.Text.Tree do
     %{tree | ft: ft}
   end
 
+  @doc """
+  Format a range of text with the given attributes.
+  This inserts Format items at the boundaries of the range to apply formatting.
+  """
+  def format(%Tree{} = tree, index, length, attributes, parent_name, client_id, last_clock) do
+    %Meter{len: tree_len} = FingerTree.measure(tree.ft)
+
+    # Clamp the range to valid bounds
+    index = max(0, index)
+    end_index = min(index + length, tree_len)
+    length = end_index - index
+
+    if length <= 0 do
+      tree
+    else
+      # Split at the start of the range
+      {left_tree, middle_and_right} = split_at_index(tree.ft, index)
+
+      # Split at the end of the range (relative to middle_and_right)
+      {middle_tree, right_tree} = split_at_index(middle_and_right, length)
+
+      # Gather attributes from left side
+      gathered_attributes = gather_attributes(left_tree)
+
+      # Insert format items at the start of the range
+      {left_tree, last_clock} =
+        insert_format_items(
+          left_tree,
+          middle_tree,
+          gathered_attributes,
+          attributes,
+          parent_name,
+          client_id,
+          last_clock
+        )
+
+      # Now gather attributes including what we just added and the middle
+      end_gathered_attributes =
+        gather_attributes(left_tree)
+        |> merge_format_attributes(middle_tree)
+
+      # Insert negating format items at the end of the range
+      {middle_tree, _last_clock} =
+        insert_end_format_items(
+          middle_tree,
+          right_tree,
+          end_gathered_attributes,
+          gathered_attributes,
+          attributes,
+          parent_name,
+          client_id,
+          last_clock
+        )
+
+      # Combine all parts
+      ft =
+        left_tree
+        |> FingerTree.append(middle_tree)
+        |> FingerTree.append(right_tree)
+
+      %{tree | ft: ft}
+    end
+  end
+
+  defp split_at_index(ft, index) do
+    %Meter{len: tree_len} = FingerTree.measure(ft)
+
+    cond do
+      index <= 0 ->
+        {FingerTree.finger_tree(meter_object()), ft}
+
+      index >= tree_len ->
+        {ft, FingerTree.finger_tree(meter_object())}
+
+      true ->
+        {l, v, r} =
+          FingerTree.split(ft, fn %{len: len} ->
+            index <= len
+          end)
+
+        %Meter{len: len_l} = FingerTree.measure(l)
+
+        cond do
+          len_l == index ->
+            {l, FingerTree.cons(r, v)}
+
+          len_l + Item.content_length(v) == index ->
+            {FingerTree.conj(l, v), r}
+
+          len_l < index and index < len_l + v.length ->
+            diff = index - len_l
+            {split_l, split_r} = Item.split(v, diff)
+            {FingerTree.conj(l, split_l), FingerTree.cons(r, split_r)}
+
+          true ->
+            # Fallback - shouldn't happen
+            {l, FingerTree.cons(r, v)}
+        end
+    end
+  end
+
+  defp insert_format_items(
+         left_tree,
+         right_tree,
+         gathered_attributes,
+         attributes,
+         parent_name,
+         client_id,
+         last_clock
+       ) do
+    # For each attribute, insert a Format item if it differs from gathered
+    Enum.reduce(attributes, {left_tree, last_clock}, fn {key, value}, {tree, clock} ->
+      current_value = Map.get(gathered_attributes, key)
+
+      if current_value == value do
+        {tree, clock}
+      else
+        left_id =
+          case FingerTree.last(tree) do
+            nil -> nil
+            %Item{} = item -> Item.last_id(item)
+          end
+
+        right_id =
+          case FingerTree.first(right_tree) do
+            nil -> nil
+            %Item{id: id} -> id
+          end
+
+        item =
+          Item.new(
+            id: ID.new(client_id, clock),
+            content: [Format.new(key, value)],
+            parent_name: parent_name,
+            origin: left_id,
+            right_origin: right_id
+          )
+
+        {FingerTree.conj(tree, item), clock + 1}
+      end
+    end)
+  end
+
+  defp merge_format_attributes(gathered, middle_tree) do
+    do_merge_format_attributes(middle_tree, gathered)
+  end
+
+  defp do_merge_format_attributes(%FingerTree.EmptyTree{}, acc), do: acc
+
+  defp do_merge_format_attributes(tree, acc) do
+    case FingerTree.first(tree) do
+      %Item{content: [%Format{} = format], deleted?: false} ->
+        do_merge_format_attributes(
+          FingerTree.rest(tree),
+          Map.merge(acc, Format.to_map(format))
+        )
+
+      _ ->
+        do_merge_format_attributes(FingerTree.rest(tree), acc)
+    end
+  end
+
+  defp insert_end_format_items(
+         middle_tree,
+         right_tree,
+         _end_gathered_attributes,
+         original_gathered_attributes,
+         applied_attributes,
+         parent_name,
+         client_id,
+         last_clock
+       ) do
+    # For each applied attribute, we need to insert a negating format if:
+    # 1. The attribute was applied in this format call
+    # 2. The original gathered attributes didn't have this value
+    # This "turns off" the formatting after the range
+
+    Enum.reduce(applied_attributes, {middle_tree, last_clock}, fn {key, value}, {tree, clock} ->
+      original_value = Map.get(original_gathered_attributes, key)
+
+      # Only negate if we actually changed the formatting
+      if original_value != value do
+        left_id =
+          case FingerTree.last(tree) do
+            nil -> nil
+            %Item{} = item -> Item.last_id(item)
+          end
+
+        right_id =
+          case FingerTree.first(right_tree) do
+            nil -> nil
+            %Item{id: id} -> id
+          end
+
+        # Insert the original value (or nil if there was none) to restore
+        restore_value = original_value
+
+        item =
+          Item.new(
+            id: ID.new(client_id, clock),
+            content: [Format.new(key, restore_value)],
+            parent_name: parent_name,
+            origin: left_id,
+            right_origin: right_id
+          )
+
+        {FingerTree.conj(tree, item), clock + 1}
+      else
+        {tree, clock}
+      end
+    end)
+  end
+
   def delete(%Tree{} = tree, index, length) do
     {l, v, r} =
       FingerTree.split(tree.ft, fn %{len: len} ->

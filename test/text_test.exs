@@ -522,7 +522,7 @@ defmodule Y.TextTest do
                deleted?: true
              },
              %Y.Item{
-               content: %Y.Content.String{str: "cd"},
+               content: [%Y.Content.String{str: "cd"}],
                deleted?: false
              },
              %Y.Item{

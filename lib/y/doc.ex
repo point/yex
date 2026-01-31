@@ -4,6 +4,9 @@ defmodule Y.Doc do
   alias Y.ID
   alias Y.Item
   alias Y.Type.Array
+  alias Y.Type.XmlFragment
+  alias Y.Type.XmlElement
+  alias Y.Type.XmlText
   alias Y.Type.Unknown
   alias Y.Transaction
   alias Y.Decoder
@@ -26,7 +29,8 @@ defmodule Y.Doc do
           synced?: boolean(),
           delete_set: Map.t(),
           pending_structs: Map.t() | nil,
-          pending_delete_sets: Map.t() | nil
+          pending_delete_sets: Map.t() | nil,
+          transaction_observers: MapSet.t()
         }
 
   defstruct name: nil,
@@ -45,7 +49,8 @@ defmodule Y.Doc do
             synced?: false,
             delete_set: %{},
             pending_structs: nil,
-            pending_delete_sets: nil
+            pending_delete_sets: nil,
+            transaction_observers: MapSet.new()
 
   def start_link(opts \\ []) do
     opts = compose_opts(opts)
@@ -120,6 +125,45 @@ defmodule Y.Doc do
     GenServer.call(doc_name, {:get_text, text_name})
   end
 
+  def get_xml_fragment(transaction, fragment_name \\ UUID.uuid4())
+
+  def get_xml_fragment(%Transaction{doc: doc} = transaction, fragment_name) do
+    case do_get_xml_fragment(doc, fragment_name) do
+      {:ok, fragment, doc} -> {:ok, fragment, %{transaction | doc: doc}}
+      {:error, _} = err -> err
+    end
+  end
+
+  def get_xml_fragment(doc_name, fragment_name) do
+    GenServer.call(doc_name, {:get_xml_fragment, fragment_name})
+  end
+
+  def get_xml_element(transaction, node_name, element_name \\ UUID.uuid4())
+
+  def get_xml_element(%Transaction{doc: doc} = transaction, node_name, element_name) do
+    case do_get_xml_element(doc, node_name, element_name) do
+      {:ok, element, doc} -> {:ok, element, %{transaction | doc: doc}}
+      {:error, _} = err -> err
+    end
+  end
+
+  def get_xml_element(doc_name, node_name, element_name) do
+    GenServer.call(doc_name, {:get_xml_element, node_name, element_name})
+  end
+
+  def get_xml_text(transaction, text_name \\ UUID.uuid4())
+
+  def get_xml_text(%Transaction{doc: doc} = transaction, text_name) do
+    case do_get_xml_text(doc, text_name) do
+      {:ok, xml_text, doc} -> {:ok, xml_text, %{transaction | doc: doc}}
+      {:error, _} = err -> err
+    end
+  end
+
+  def get_xml_text(doc_name, text_name) do
+    GenServer.call(doc_name, {:get_xml_text, text_name})
+  end
+
   def transact(doc_name, f, opts \\ []) do
     GenServer.call(doc_name, {:transact, f, opts})
   end
@@ -129,6 +173,21 @@ defmodule Y.Doc do
       {:ok, doc} -> doc
       _ -> raise "Failed to run transact"
     end
+  end
+
+  @doc """
+  Subscribe to transaction events.
+  The observer will receive {:after_transaction, transaction} messages.
+  """
+  def subscribe_transaction(doc_name, observer_pid) do
+    GenServer.call(doc_name, {:subscribe_transaction, observer_pid})
+  end
+
+  @doc """
+  Unsubscribe from transaction events.
+  """
+  def unsubscribe_transaction(doc_name, observer_pid) do
+    GenServer.call(doc_name, {:unsubscribe_transaction, observer_pid})
   end
 
   def get(%Transaction{doc: doc}, name), do: get!(doc, name)
@@ -354,6 +413,27 @@ defmodule Y.Doc do
     end
   end
 
+  def handle_call({:get_xml_fragment, name}, _, doc) do
+    case do_get_xml_fragment(doc, name) do
+      {:ok, fragment, doc} -> {:reply, {:ok, fragment}, doc}
+      {:error, _} = err -> {:reply, err, doc}
+    end
+  end
+
+  def handle_call({:get_xml_element, node_name, name}, _, doc) do
+    case do_get_xml_element(doc, node_name, name) do
+      {:ok, element, doc} -> {:reply, {:ok, element}, doc}
+      {:error, _} = err -> {:reply, err, doc}
+    end
+  end
+
+  def handle_call({:get_xml_text, name}, _, doc) do
+    case do_get_xml_text(doc, name) do
+      {:ok, xml_text, doc} -> {:reply, {:ok, xml_text}, doc}
+      {:error, _} = err -> {:reply, err, doc}
+    end
+  end
+
   def handle_call(
         {:transact, f, opts},
         _,
@@ -371,6 +451,9 @@ defmodule Y.Doc do
           |> Transaction.finalize()
           |> Transaction.cleanup()
 
+        # Notify transaction observers
+        notify_transaction_observers(new_transaction, new_transaction.doc)
+
         {:reply, {:ok, name}, new_transaction.doc}
 
       error ->
@@ -379,8 +462,24 @@ defmodule Y.Doc do
     end
   end
 
+  def handle_call({:subscribe_transaction, observer_pid}, _, doc) do
+    new_observers = MapSet.put(doc.transaction_observers, observer_pid)
+    {:reply, :ok, %{doc | transaction_observers: new_observers}}
+  end
+
+  def handle_call({:unsubscribe_transaction, observer_pid}, _, doc) do
+    new_observers = MapSet.delete(doc.transaction_observers, observer_pid)
+    {:reply, :ok, %{doc | transaction_observers: new_observers}}
+  end
+
   def handle_call(:get_instance, _, doc) do
     {:reply, {:ok, doc}, doc}
+  end
+
+  defp notify_transaction_observers(transaction, doc) do
+    Enum.each(doc.transaction_observers, fn observer_pid ->
+      send(observer_pid, {:after_transaction, transaction})
+    end)
   end
 
   defp compose_opts(opts) do
@@ -479,6 +578,54 @@ defmodule Y.Doc do
   defp do_get_text(%Doc{} = doc, name) do
     text = Y.Type.Text.new(doc, name)
     {:ok, text, %Doc{doc | share: Map.put_new(doc.share, name, text)}}
+  end
+
+  defp do_get_xml_fragment(%Doc{share: share} = doc, name) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        fragment = XmlFragment.from_unknown(u)
+        {:ok, fragment, %{doc | share: Map.replace(share, name, fragment)}}
+
+      _ ->
+        {:error, "Type with the name #{name} has already been added"}
+    end
+  end
+
+  defp do_get_xml_fragment(%Doc{} = doc, name) do
+    fragment = XmlFragment.new(doc, name)
+    {:ok, fragment, %Doc{doc | share: Map.put_new(doc.share, name, fragment)}}
+  end
+
+  defp do_get_xml_element(%Doc{share: share} = doc, node_name, name) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        element = XmlElement.from_unknown(u, node_name)
+        {:ok, element, %{doc | share: Map.replace(share, name, element)}}
+
+      _ ->
+        {:error, "Type with the name #{name} has already been added"}
+    end
+  end
+
+  defp do_get_xml_element(%Doc{} = doc, node_name, name) do
+    element = XmlElement.new(doc, node_name, name)
+    {:ok, element, %Doc{doc | share: Map.put_new(doc.share, name, element)}}
+  end
+
+  defp do_get_xml_text(%Doc{share: share} = doc, name) when is_map_key(share, name) do
+    case share[name] do
+      %Unknown{} = u ->
+        xml_text = XmlText.from_unknown(u)
+        {:ok, xml_text, %{doc | share: Map.replace(share, name, xml_text)}}
+
+      _ ->
+        {:error, "Type with the name #{name} has already been added"}
+    end
+  end
+
+  defp do_get_xml_text(%Doc{} = doc, name) do
+    xml_text = XmlText.new(doc, name)
+    {:ok, xml_text, %Doc{doc | share: Map.put_new(doc.share, name, xml_text)}}
   end
 
   defp do_find_parent(type, child_item) do

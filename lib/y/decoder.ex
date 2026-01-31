@@ -316,11 +316,18 @@ defmodule Y.Decoder do
   defp read_content(7, state, %Transaction{doc: doc} = transaction) do
     {type_num, state} = State.read_type_ref(state)
 
-    type =
+    {type, state} =
       case type_num do
-        0 -> Y.Type.Array.new(doc)
-        1 -> Y.Type.Map.new(doc)
-        _ -> raise("Reading this type of content is not implemented")
+        0 -> {Y.Type.Array.new(doc), state}
+        1 -> {Y.Type.Map.new(doc), state}
+        2 -> {Y.Type.Text.new(doc), state}
+        3 ->
+          # XmlElement - read node_name from string buffer
+          {node_name, state} = State.read_string(state)
+          {Y.Type.XmlElement.new(doc, node_name), state}
+        4 -> {Y.Type.XmlFragment.new(doc), state}
+        6 -> {Y.Type.XmlText.new(doc), state}
+        _ -> raise("Reading this type of content is not implemented: type_ref=#{type_num}")
       end
 
     # Add to doc.share so child items can find their parent during integration
