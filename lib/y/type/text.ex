@@ -314,6 +314,11 @@ defmodule Y.Type.Text do
       end
     end
 
+    # When before_item is nil, append to the end
+    def add_before(%Text{} = text, nil, %Item{} = item) do
+      {:ok, %{text | tree: Tree.conj!(text.tree, item)}}
+    end
+
     def next(%Text{tree: tree}, %Item{} = item) do
       Tree.next(tree, item)
     end

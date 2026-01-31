@@ -816,12 +816,19 @@ defmodule Y.Decoder do
       | transaction:
           Doc.put_pending_delete_sets(
             transaction,
-            merge_structs(
+            merge_delete_sets(
               transaction.doc.pending_delete_sets,
               u
             )
           )
     }
+  end
+
+  # Merge two delete sets (maps of client_id => MapSet of {clock, length} tuples)
+  defp merge_delete_sets(ds1, ds2) do
+    Map.merge(ds1, ds2, fn _client, set1, set2 ->
+      MapSet.union(set1, set2)
+    end)
   end
 
   # Decode a state vector from binary format (V1 simple format)

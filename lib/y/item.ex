@@ -100,11 +100,23 @@ defmodule Y.Item do
           {JSON.new(l), JSON.new(r)}
 
         [%ContentString{str: str}] when at_index >= 0 ->
-          if at_index < String.length(str),
+          if at_index >= String.length(str),
             do: raise("String is too short to split at #{at_index}")
 
           {l, r} = String.split_at(str, at_index)
           {ContentString.new(l), ContentString.new(r)}
+
+        # Handle bare ContentString (not wrapped in list)
+        %ContentString{str: str} when at_index >= 0 ->
+          if at_index >= String.length(str),
+            do: raise("String is too short to split at #{at_index}")
+
+          {l, r} = String.split_at(str, at_index)
+          {ContentString.new(l), ContentString.new(r)}
+
+        # Handle bare Deleted (not wrapped in list)
+        %Deleted{len: len} when at_index >= 0 and at_index < len ->
+          {Deleted.new(at_index), Deleted.new(len - at_index)}
 
         content when is_list(content) ->
           {_content_l, _content_r} = Enum.split(content, at_index)

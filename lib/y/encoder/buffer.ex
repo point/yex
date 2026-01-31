@@ -15,6 +15,7 @@ defmodule Y.Encoder.Buffer do
             right_clock: ClockBuffer.new(),
             parent_info: InfoBuffer.new(),
             string: StringBuffer.new(),
+            key: StringBuffer.new(),
             length: ClientOrLengthBuffer.new(),
             type_ref: ClientOrLengthBuffer.new(),
             delete_set_cur_val: 0
@@ -55,6 +56,10 @@ defmodule Y.Encoder.Buffer do
 
   def write(%Buffer{string: sb} = b, :string, str) do
     %{b | string: StringBuffer.write(sb, str)}
+  end
+
+  def write(%Buffer{key: kb} = b, :key, key_str) do
+    %{b | key: StringBuffer.write(kb, key_str)}
   end
 
   def write(%Buffer{} = b, :ds_clock, clock) do

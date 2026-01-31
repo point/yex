@@ -399,7 +399,9 @@ defmodule Y.Encoder do
     buf
     |> write(:length, end_ - offset)
     |> then(fn buf ->
-      content
+      # Normalize content to list if it's a single element
+      content_list = if is_list(content), do: content, else: [content]
+      content_list
       |> Enum.slice(offset..end_)
       |> Enum.reduce(buf, &write_any_content(&2, &1))
     end)

@@ -567,8 +567,12 @@ defmodule Y.Doc do
   defp do_get_text(%Doc{share: share} = doc, name) when is_map_key(share, name) do
     case share[name] do
       %Unknown{} = u ->
-        map = Y.Type.Text.from_unknown(u)
-        {:ok, map, %{doc | share: Map.replace(share, name, map)}}
+        text = Y.Type.Text.from_unknown(u)
+        {:ok, text, %{doc | share: Map.replace(share, name, text)}}
+
+      %Y.Type.Text{} = text ->
+        # Type already exists as Text, just return it
+        {:ok, text, doc}
 
       _ ->
         {:error, "Type with the name #{name} has already been added"}
