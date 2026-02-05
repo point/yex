@@ -26,3 +26,5 @@ yex-*.tar
 /tmp/
 
 deps
+
+.claude/

@@ -1,0 +1,71 @@
+# The directory Mix will write compiled artifacts to.
+/_build/
+
+# If you run "mix test --cover", coverage assets end up here.
+/cover/
+
+# The directory Mix downloads your dependencies sources to.
+/deps/
+
+# Where third-party dependencies like ExDoc output generated docs.
+/docs/doc/
+
+# Ignore .fetch files in case you like to edit your project deps locally.
+/.fetch
+
+# If the VM crashes, it generates a dump, let's ignore it too.
+erl_crash.dump
+
+# Also ignore archive artifacts (built via "mix archive.build").
+*.ez
+
+# Intermediate files for ElixirLS VSCode extension
+.elixir_ls
+
+# Node Modules
+node_modules/
+
+# Webpack stats.json
+/assets/stats.json
+
+# Environment Vars
+/.env*
+gen
+
+# editor junk
+.swp
+.*.swp
+
+# OS specific files
+.DS_Store
+
+/debug.log
+/uploads
+
+# Ignore assets that are produced by build tools.
+/priv/static/assets/
+/priv/static/images/print/
+
+# Ignore digested assets cache.
+/priv/static/cache_manifest.json
+
+# In case you use Node.js/npm, you want to ignore these.
+npm-debug.log
+
+# dialyzer
+/priv/plts/*.plt
+/priv/plts/*.plt.hash
+
+# BEAM crash data
+log/
+
+# dont check in temp data
+/tmp
+
+# configs for dev local
+/config/*.secret.exs
+
+scripts/
+
+# devenv 
+.devenv
